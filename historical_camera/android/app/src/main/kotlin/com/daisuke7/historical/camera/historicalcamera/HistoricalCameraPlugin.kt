@@ -128,12 +128,19 @@ class HistoricalCameraPlugin :
             }
 
             "capturePhoto" -> {
-                if (controller == null) {
-                    return result.error(ErrorCodes.BAD_STATE, "not initialized", null)
+                val controller = controller
+                    ?: return result.error(ErrorCodes.BAD_STATE, "not initialized", null)
+                controller.capturePhoto { outcome ->
+                    outcome.fold(
+                        onSuccess = { result.success(it) },
+                        onFailure = { error ->
+                            val plugin = error as? PluginError
+                            result.error(
+                                plugin?.code ?: ErrorCodes.CAPTURE_FAILED,
+                                error.message, null)
+                        },
+                    )
                 }
-                result.error(
-                    ErrorCodes.CAPTURE_FAILED,
-                    "not implemented until task T10", null)
             }
 
             "startRecording", "stopRecording" -> {

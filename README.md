@@ -62,4 +62,5 @@ MIT License([LICENSE](LICENSE))。Copyright (c) 2026 Daisuke Sawada(daisuke7)
   - [x] T7 iOS 写真保存(フル解像度フィルタ適用+フォトライブラリ保存。実機検証: 見た目一致・向き・現代=無加工) — 2026-07-02
   - [x] T8 Android パススルー(CameraX+GL ES3+SurfaceProducer。Pixel 6 実機で全向き・アスペクト・UI追従確認。回転モデルの実挙動は implementation-notes #3) — 2026-07-02
   - [x] T9 Android フィルタシェーダー(03 §3 の GLSL ES 3.0 移植、external/2D 2変種。実機検証: 年代変化・GPU 0.7〜5.6ms) — 2026-07-02
-  - [ ] T10 Android 写真保存 / T11 結合
+  - [x] T10 Android 写真保存(gl-stillスレッド+フル解像度フィルタ+MediaStore。実機検証: 見た目一致・向き・現代=無加工) — 2026-07-02
+  - [ ] T11 結合・ライフサイクル

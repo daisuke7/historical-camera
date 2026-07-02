@@ -1,5 +1,6 @@
 package com.daisuke7.historical.camera.historicalcamera
 
+import android.graphics.Bitmap
 import android.graphics.SurfaceTexture
 import android.opengl.EGL14
 import android.opengl.EGLConfig
@@ -9,6 +10,7 @@ import android.opengl.EGLExt
 import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
 import android.opengl.GLES30
+import android.opengl.GLUtils
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
@@ -336,15 +338,30 @@ void main() {
     private val texMatrix = FloatArray(16)
     private val startTimeNs = System.nanoTime()
 
-    // Cached uniform/attribute locations (looked up once after link).
-    private var locPosition = -1
-    private var locTexCoord = -1
-    private var locTexture = -1
-    private var locTexMatrix = -1
-    private var locParams = -1
-    private var locTime = -1
-    private var locResolution = -1
-    private var locOrientation = -1
+    /** Cached uniform/attribute locations for one linked program. */
+    private class ShaderLocations(program: Int) {
+        val position = GLES30.glGetAttribLocation(program, "aPosition")
+        val texCoord = GLES30.glGetAttribLocation(program, "aTexCoord")
+        val texture = GLES30.glGetUniformLocation(program, "uTexture")
+        val texMatrix = GLES30.glGetUniformLocation(program, "uTexMatrix")
+        val params = GLES30.glGetUniformLocation(program, "uParams")
+        val time = GLES30.glGetUniformLocation(program, "uTime")
+        val resolution = GLES30.glGetUniformLocation(program, "uResolution")
+        val orientation = GLES30.glGetUniformLocation(program, "uOrientation")
+    }
+
+    private var previewLocs: ShaderLocations? = null
+
+    // Still-photo path (docs/06 §3.4): second GL thread with a shared
+    // context and the sampler2D shader variant. Created lazily.
+    private var stillThread: HandlerThread? = null
+    private var stillHandler: Handler? = null
+    private var stillContext: EGLContext = EGL14.EGL_NO_CONTEXT
+    private var stillPbuffer: EGLSurface = EGL14.EGL_NO_SURFACE
+    private var stillProgram = 0
+    private var stillLocs: ShaderLocations? = null
+    private var stillPositionBuffer: FloatBuffer? = null
+    private var stillTexCoordBuffer: FloatBuffer? = null
 
     // GPU frame-time measurement (docs/08 T9): EXT_disjoint_timer_query,
     // debug builds only, ping-pong queries to avoid stalling.
@@ -424,9 +441,175 @@ void main() {
         released = true
     }
 
+    /**
+     * Full-resolution still filtering (docs/06 §3.4) on the dedicated
+     * gl-still thread so a 12MP pass never blocks the preview. [input] must
+     * be upright (EXIF rotation applied) and is recycled here; [params] must
+     * already carry the resolution-scaled grainSize (docs/03 §4).
+     */
+    fun renderStill(input: Bitmap, params: FilterParams, onResult: (Bitmap?) -> Unit) {
+        val stillHandler = ensureStillThread()
+        if (stillHandler == null) {
+            onResult(null)
+            return
+        }
+        stillHandler.post {
+            val result = try {
+                renderStillBlocking(input, params)
+            } catch (t: Throwable) {
+                Log.e(TAG, "renderStill failed", t)
+                null
+            }
+            onResult(result)
+        }
+    }
+
+    private fun ensureStillThread(): Handler? {
+        if (display == EGL14.EGL_NO_DISPLAY || !configured) return null
+        stillHandler?.let { return it }
+        val thread = HandlerThread("gl-still").apply { start() }
+        val handler = Handler(thread.looper)
+        stillThread = thread
+        stillHandler = handler
+        handler.post {
+            // Shared context so program/texture objects live in one share
+            // group (docs/06 §3.4); the 2D-variant program is its own.
+            val contextAttribs = intArrayOf(
+                EGL14.EGL_CONTEXT_CLIENT_VERSION, 3, EGL14.EGL_NONE)
+            stillContext = EGL14.eglCreateContext(
+                display, eglConfig, context, contextAttribs, 0)
+            val pbufferAttribs = intArrayOf(
+                EGL14.EGL_WIDTH, 1, EGL14.EGL_HEIGHT, 1, EGL14.EGL_NONE)
+            stillPbuffer = EGL14.eglCreatePbufferSurface(
+                display, eglConfig, pbufferAttribs, 0)
+            EGL14.eglMakeCurrent(display, stillPbuffer, stillPbuffer, stillContext)
+            stillProgram = buildProgram(
+                VERTEX_SHADER, fragmentSource(external = false))
+            stillLocs = ShaderLocations(stillProgram)
+            stillPositionBuffer = floatBufferOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)
+            stillTexCoordBuffer = floatBufferOf(0f, 0f, 1f, 0f, 0f, 1f, 1f, 1f)
+        }
+        return handler
+    }
+
+    /** Runs on the gl-still thread with its context current. */
+    private fun renderStillBlocking(input: Bitmap, params: FilterParams): Bitmap? {
+        EGL14.eglMakeCurrent(display, stillPbuffer, stillPbuffer, stillContext)
+        val locs = stillLocs ?: return null
+
+        // Respect the GL texture-size limit (docs/06 §3.4: cap at 4096).
+        val maxSize = IntArray(1)
+        GLES30.glGetIntegerv(GLES30.GL_MAX_TEXTURE_SIZE, maxSize, 0)
+        val cap = minOf(maxSize[0], 4096)
+        var bitmap = input
+        if (bitmap.width > cap || bitmap.height > cap) {
+            val scale = cap.toFloat() / maxOf(bitmap.width, bitmap.height)
+            val scaled = Bitmap.createScaledBitmap(
+                bitmap,
+                (bitmap.width * scale).toInt(),
+                (bitmap.height * scale).toInt(),
+                true)
+            bitmap.recycle()
+            bitmap = scaled
+        }
+        val w = bitmap.width
+        val h = bitmap.height
+
+        val textures = IntArray(2)
+        GLES30.glGenTextures(2, textures, 0)
+        // Input: upload, then recycle immediately (docs/06 §3.4 memory rule).
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, textures[0])
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,
+            GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,
+            GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,
+            GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_CLAMP_TO_EDGE)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,
+            GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE)
+        GLUtils.texImage2D(GLES30.GL_TEXTURE_2D, 0, bitmap, 0)
+        bitmap.recycle()
+
+        // Output texture + FBO.
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, textures[1])
+        GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, w, h, 0,
+            GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, null)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,
+            GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,
+            GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
+        val fbo = IntArray(1)
+        GLES30.glGenFramebuffers(1, fbo, 0)
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, fbo[0])
+        GLES30.glFramebufferTexture2D(GLES30.GL_FRAMEBUFFER,
+            GLES30.GL_COLOR_ATTACHMENT0, GLES30.GL_TEXTURE_2D, textures[1], 0)
+        if (GLES30.glCheckFramebufferStatus(GLES30.GL_FRAMEBUFFER)
+            != GLES30.GL_FRAMEBUFFER_COMPLETE) {
+            GLES30.glDeleteFramebuffers(1, fbo, 0)
+            GLES30.glDeleteTextures(2, textures, 0)
+            return null
+        }
+
+        GLES30.glViewport(0, 0, w, h)
+        GLES30.glUseProgram(stillProgram)
+        GLES30.glEnableVertexAttribArray(locs.position)
+        GLES30.glVertexAttribPointer(
+            locs.position, 2, GLES30.GL_FLOAT, false, 0, stillPositionBuffer)
+        GLES30.glEnableVertexAttribArray(locs.texCoord)
+        GLES30.glVertexAttribPointer(
+            locs.texCoord, 2, GLES30.GL_FLOAT, false, 0, stillTexCoordBuffer)
+
+        // Identity matrix: combined with the doc-space flip in the shader and
+        // glReadPixels' bottom-up order, the read-back bitmap comes out
+        // upright without an extra flip pass.
+        val identity = FloatArray(16).also { it[0] = 1f; it[5] = 1f; it[10] = 1f; it[15] = 1f }
+        GLES30.glUniformMatrix4fv(locs.texMatrix, 1, false, identity, 0)
+        GLES30.glUniform1fv(locs.params, 20, params.toFloatArray(), 0)
+        GLES30.glUniform1f(locs.time, currentTimeSeconds())
+        GLES30.glUniform2f(locs.resolution, w.toFloat(), h.toFloat())
+        GLES30.glUniform1f(locs.orientation, 0f)
+        GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, textures[0])
+        GLES30.glUniform1i(locs.texture, 0)
+        GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
+
+        val buffer = ByteBuffer.allocateDirect(w * h * 4)
+            .order(ByteOrder.nativeOrder())
+        GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA,
+            GLES30.GL_UNSIGNED_BYTE, buffer)
+        buffer.position(0)
+        val result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        result.copyPixelsFromBuffer(buffer)
+
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
+        GLES30.glDeleteFramebuffers(1, fbo, 0)
+        GLES30.glDeleteTextures(2, textures, 0)
+        return result
+    }
+
     /** Tear down in the strict order of docs/06 §6. */
     fun release(onDone: () -> Unit) {
         released = true
+        // Capture the display handle: the gl-render thread nulls the field
+        // concurrently during its own teardown.
+        val stillDisplay = display
+        stillHandler?.post {
+            if (stillContext != EGL14.EGL_NO_CONTEXT
+                && stillDisplay != EGL14.EGL_NO_DISPLAY) {
+                EGL14.eglMakeCurrent(stillDisplay, EGL14.EGL_NO_SURFACE,
+                    EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+                if (stillPbuffer != EGL14.EGL_NO_SURFACE) {
+                    EGL14.eglDestroySurface(stillDisplay, stillPbuffer)
+                    stillPbuffer = EGL14.EGL_NO_SURFACE
+                }
+                EGL14.eglDestroyContext(stillDisplay, stillContext)
+                stillContext = EGL14.EGL_NO_CONTEXT
+            }
+            EGL14.eglReleaseThread()
+            stillThread?.quitSafely()
+            stillThread = null
+            stillHandler = null
+        }
         handler.post {
             cameraSurfaceTexture?.setOnFrameAvailableListener(null)
             cameraSurface?.release()
@@ -541,13 +724,14 @@ void main() {
 
         GLES30.glViewport(0, 0, width, height)
         GLES30.glUseProgram(program)
+        val locs = previewLocs ?: return
 
-        GLES30.glEnableVertexAttribArray(locPosition)
+        GLES30.glEnableVertexAttribArray(locs.position)
         GLES30.glVertexAttribPointer(
-            locPosition, 2, GLES30.GL_FLOAT, false, 0, positionBuffer)
-        GLES30.glEnableVertexAttribArray(locTexCoord)
+            locs.position, 2, GLES30.GL_FLOAT, false, 0, positionBuffer)
+        GLES30.glEnableVertexAttribArray(locs.texCoord)
         GLES30.glVertexAttribPointer(
-            locTexCoord, 2, GLES30.GL_FLOAT, false, 0, texCoordBuffer)
+            locs.texCoord, 2, GLES30.GL_FLOAT, false, 0, texCoordBuffer)
 
         // The SurfaceTexture matrix carries flip/crop plus the HAL's sensor
         // rotation (implementation-notes #3). Front-camera mirroring is
@@ -559,19 +743,16 @@ void main() {
                 matrix[12 + row] += texMatrix[row]
             }
         }
-        GLES30.glUniformMatrix4fv(locTexMatrix, 1, false, matrix, 0)
+        GLES30.glUniformMatrix4fv(locs.texMatrix, 1, false, matrix, 0)
 
-        val p = params
-        GLES30.glUniform1fv(locParams, 20, p.toFloatArray(), 0)
-        val seconds =
-            ((System.nanoTime() - startTimeNs) / 1_000_000_000.0 % 3600.0)
-        GLES30.glUniform1f(locTime, seconds.toFloat())
-        GLES30.glUniform2f(locResolution, width.toFloat(), height.toFloat())
-        GLES30.glUniform1f(locOrientation, orientationTurns.toFloat())
+        GLES30.glUniform1fv(locs.params, 20, params.toFloatArray(), 0)
+        GLES30.glUniform1f(locs.time, currentTimeSeconds())
+        GLES30.glUniform2f(locs.resolution, width.toFloat(), height.toFloat())
+        GLES30.glUniform1f(locs.orientation, orientationTurns.toFloat())
 
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
         GLES30.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
-        GLES30.glUniform1i(locTexture, 0)
+        GLES30.glUniform1i(locs.texture, 0)
 
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
 
@@ -580,15 +761,12 @@ void main() {
     }
 
     private fun cacheLocations() {
-        locPosition = GLES30.glGetAttribLocation(program, "aPosition")
-        locTexCoord = GLES30.glGetAttribLocation(program, "aTexCoord")
-        locTexture = GLES30.glGetUniformLocation(program, "uTexture")
-        locTexMatrix = GLES30.glGetUniformLocation(program, "uTexMatrix")
-        locParams = GLES30.glGetUniformLocation(program, "uParams")
-        locTime = GLES30.glGetUniformLocation(program, "uTime")
-        locResolution = GLES30.glGetUniformLocation(program, "uResolution")
-        locOrientation = GLES30.glGetUniformLocation(program, "uOrientation")
+        previewLocs = ShaderLocations(program)
     }
+
+    /** Preview clock, shared with stills (docs/03 §4). */
+    fun currentTimeSeconds(): Float =
+        ((System.nanoTime() - startTimeNs) / 1_000_000_000.0 % 3600.0).toFloat()
 
     // MARK: GPU timing (docs/08 T9 acceptance: <8 ms on the test device)
 

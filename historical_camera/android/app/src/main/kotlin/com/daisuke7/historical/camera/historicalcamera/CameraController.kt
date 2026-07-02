@@ -3,6 +3,9 @@ package com.daisuke7.historical.camera.historicalcamera
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Handler
@@ -11,6 +14,13 @@ import android.os.PowerManager
 import android.util.Size
 import android.view.OrientationEventListener
 import android.view.Surface
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.Executors
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.Preview
@@ -61,6 +71,9 @@ class CameraController(
     private var sensorRotationDegrees = 0
     private var outputSize: Size? = null
     private var pendingInitResult: ((Result<Map<String, Any>>) -> Unit)? = null
+    private var isFrontLens = false
+    private var captureInFlight = false
+    private val writerExecutor = Executors.newSingleThreadExecutor()
 
     fun initialize(
         lens: String,
@@ -88,6 +101,7 @@ class CameraController(
         val renderer = FilterRenderer(producer)
         this.renderer = renderer
         val mirror = lens == "front"
+        isFrontLens = mirror
 
         val providerFuture = ProcessCameraProvider.getInstance(activity)
         providerFuture.addListener({
@@ -189,6 +203,131 @@ class CameraController(
         return true
     }
 
+    // MARK: Still capture (docs/06 §3.4)
+
+    fun capturePhoto(onResult: (Result<Map<String, Any>>) -> Unit) {
+        val imageCapture = imageCapture
+        val renderer = renderer
+        if (!isInitialized || imageCapture == null || renderer == null) {
+            onResult(Result.failure(PluginError(
+                ErrorCodes.BAD_STATE, "camera is not initialized")))
+            return
+        }
+        // Overlapping captures are BAD_STATE (docs/02 §3.1).
+        if (captureInFlight) {
+            onResult(Result.failure(PluginError(
+                ErrorCodes.BAD_STATE, "a capture is already in progress")))
+            return
+        }
+        captureInFlight = true
+        val complete: (Result<Map<String, Any>>) -> Unit = { outcome ->
+            mainHandler.post {
+                captureInFlight = false
+                onResult(outcome)
+            }
+        }
+
+        imageCapture.takePicture(
+            writerExecutor,
+            object : ImageCapture.OnImageCapturedCallback() {
+                override fun onCaptureSuccess(image: ImageProxy) {
+                    try {
+                        processPhoto(image, renderer, complete)
+                    } catch (e: PluginError) {
+                        complete(Result.failure(e))
+                    } catch (e: Exception) {
+                        complete(Result.failure(PluginError(
+                            ErrorCodes.CAPTURE_FAILED,
+                            e.message ?: "capture processing failed")))
+                    }
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    complete(Result.failure(PluginError(
+                        ErrorCodes.CAPTURE_FAILED,
+                        exception.message ?: "capture failed")))
+                }
+            })
+    }
+
+    /** Runs on the writer executor. */
+    private fun processPhoto(
+        image: ImageProxy,
+        renderer: FilterRenderer,
+        complete: (Result<Map<String, Any>>) -> Unit,
+    ) {
+        // JPEG bytes + the rotation CameraX asks us to apply for upright.
+        val buffer = image.planes[0].buffer
+        val bytes = ByteArray(buffer.remaining()).also { buffer.get(it) }
+        val rotationDegrees = image.imageInfo.rotationDegrees
+        image.close()
+
+        // Decode with an OOM retry at half resolution (docs/06 §3.4).
+        val decoded = try {
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        } catch (e: OutOfMemoryError) {
+            val options = BitmapFactory.Options().apply { inSampleSize = 2 }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        } ?: throw PluginError(ErrorCodes.CAPTURE_FAILED, "JPEG decode failed")
+
+        // Upright + preview-matching mirror for the front camera
+        // (docs/02 §4.1).
+        val matrix = Matrix()
+        if (rotationDegrees != 0) matrix.postRotate(rotationDegrees.toFloat())
+        if (isFrontLens) matrix.postScale(-1f, 1f)
+        val upright = if (matrix.isIdentity) decoded else {
+            val transformed = Bitmap.createBitmap(
+                decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+            if (transformed != decoded) decoded.recycle()
+            transformed
+        }
+
+        // Same params as the preview, grain scaled to the still resolution
+        // (docs/03 §4; the preview reference is the output width).
+        val previewWidth = outputSize?.width ?: upright.width
+        val params = renderer.params.copy(
+            grainSize = renderer.params.grainSize *
+                (upright.width.toFloat() / previewWidth))
+
+        renderer.renderStill(upright, params) { filtered ->
+            if (filtered == null) {
+                complete(Result.failure(PluginError(
+                    ErrorCodes.CAPTURE_FAILED, "GPU still-render failed")))
+                return@renderStill
+            }
+            writerExecutor.execute {
+                try {
+                    val stamp = SimpleDateFormat(
+                        "yyyyMMdd_HHmmssSSS", Locale.US).format(Date())
+                    val temp = File(activity.cacheDir, "historical_$stamp.jpg")
+                    temp.outputStream().use { out ->
+                        if (!filtered.compress(
+                                Bitmap.CompressFormat.JPEG, 90, out)) {
+                            throw PluginError(
+                                ErrorCodes.SAVE_FAILED, "JPEG encode failed")
+                        }
+                    }
+                    val width = filtered.width
+                    val height = filtered.height
+                    filtered.recycle()
+                    // Complete after the gallery save (docs/08 §3-4).
+                    MediaWriter.saveToGallery(activity, temp)
+                    emitEvent(mapOf(
+                        "type" to "photoSaved", "path" to temp.absolutePath))
+                    complete(Result.success(mapOf(
+                        "path" to temp.absolutePath,
+                        "width" to width,
+                        "height" to height)))
+                } catch (e: PluginError) {
+                    complete(Result.failure(e))
+                } catch (e: Exception) {
+                    complete(Result.failure(PluginError(
+                        ErrorCodes.SAVE_FAILED, e.message ?: "save failed")))
+                }
+            }
+        }
+    }
+
     fun pause() {
         val provider = cameraProvider ?: return
         val preview = preview ?: return
@@ -236,6 +375,7 @@ class CameraController(
         isInitialized = false
         val renderer = renderer
         this.renderer = null
+        writerExecutor.shutdown()
         if (renderer != null) {
             renderer.release { mainHandler.post(onDone) }
         } else {
