@@ -54,9 +54,12 @@ CameraX Preview ユースケース
     (P2 の MediaRecorder Surface へ描画可能な config は後から差し替えられないため)。
 - 出力: **`textureRegistry.createSurfaceProducer()` を使用**
   (`createSurfaceTexture()` は Flutter 3.22+ で非推奨。SurfaceProducer は
-  Impeller/Skia 両対応)。`surfaceProducer.setSize(previewWidth, previewHeight)`
-  (横長固定。回転で変えない)→ `surfaceProducer.getSurface()` を
-  `eglCreateWindowSurface` に渡す。`surfaceProducer.id()` が Dart へ返す textureId。
+  Impeller/Skia 両対応)。**出力寸法は「カメラ解像度をセンサー回転分だけ入れ替えた
+  自然向きの寸法」**(例: カメラ 1280x960 → 出力 960x1280。02 §4.1・下記 transform
+  行列の実挙動による)。`surfaceProducer.setSize(outW, outH)`(初期化時に確定、
+  回転で変えない)→ `surfaceProducer.getSurface()` を `eglCreateWindowSurface` に渡す。
+  `surfaceProducer.id()` が Dart へ返す textureId。入力 SurfaceTexture の
+  `setDefaultBufferSize` は**カメラ解像度のまま**にする。
   - `SurfaceProducer.Callback` の `onSurfaceAvailable` / `onSurfaceDestroyed` を実装し、
     Surface 差し替え時(background 復帰等)に EGLSurface を作り直すこと。
 - 入力: GL スレッドで `glGenTextures`(OES)→ `SurfaceTexture(texIdA)` を生成し
@@ -65,7 +68,9 @@ CameraX Preview ユースケース
 - 描画: 全画面クアッド(三角形2枚)+ フラグメントシェーダー。頂点シェーダーは
   03 §3.1 の固定実装(`#version 300 es` / in・out 構文)。
   - `surfaceTexture.getTransformMatrix()` を `texMatrix` uniform として渡す。
-    **この行列は y-flip・クロップ補正のみで、回転は含まれない**(03 §3.1 の suv 定義)。
+    **この行列には y-flip・クロップに加え、HAL が設定するセンサー回転(背面は通常 90°)が
+    常に焼き込まれている**(targetRotation に依らず一定。Pixel 6 実測で確定 —
+    implementation-notes #3)。そのためサンプル後のコンテンツは自然向きで正立になる。
   - フロントカメラは水平反転を texMatrix に合成する(プレビューを鏡像にする)。
 - フレームドロップ: `onFrameAvailable` が描画中に再入した場合は最新 1 件のみ処理。
 
@@ -83,16 +88,23 @@ CameraX Preview ユースケース
    LifecycleOwner は Activity(`ActivityAware` で取得)を使う。
 5. `pausePreview`/`resumePreview` は `cameraProvider.unbind(preview)` / 再 bind で実現。
 
-### 3.3 回転対応(02 §4.1 のモデル)
+### 3.3 回転対応(02 §4.1 のモデル。P0 実装で実挙動に合わせて改訂)
 
-- **プレビューバッファは回転しない。** CameraX は自前 Surface へのバッファを物理回転せず
-  センサー向きのまま流す。回転情報は
-  `SurfaceRequest.setTransformationInfoListener` で受け取る
-  `TransformationInfo.rotationDegrees` を使い、quarterTurns(= rotationDegrees / 90)を
+- コンテンツは transform 行列の実挙動(§3.1)により**常に自然向きで正立**。
+  よって quarterTurns は**ディスプレイ回転の打ち消しのみ**:
+  `quarterTurns = (-displayRotation/90) mod 4`(縦=0、横=∓1)。
+  `DisplayManager.DisplayListener` で UI 回転を監視して
   (a) EventChannel `orientationChanged` で Dart へ通知、
   (b) シェーダーの `orientation` uniform に設定する。
-- 静止画: `imageCapture.targetRotation` を撮影直前にデバイス向きへ更新
-  (CameraX が JPEG の EXIF を正しく付ける)。`OrientationEventListener` で追従。
+- **`preview.targetRotation` はセンサー向きに固定し、以後変更しない**
+  (`quartersToRotation(sensorRotationDegrees / 90)`)。targetRotation を表示回転に
+  追従させると CameraX が transform を変化させ、固定寸法バッファでアスペクトが崩れる。
+  `TransformationInfo` は診断用途のみに使う(固定後は常に 0 のはず)。
+- 静止画: `imageCapture.targetRotation` は物理向きへ追従させる
+  (`OrientationEventListener`。CameraX が JPEG の EXIF を正しく付ける)。
+- **デバイス依存の注意**: 上記は「HAL が buffer transform を設定する」ことに依存する。
+  設定しない機種が存在する可能性があるため、新しいテスト機では回転検証
+  (08 T11 の 4 方向×プレビュー/保存写真)を必ず行うこと。
 
 ### 3.4 静止画キャプチャ(`capturePhoto`)
 
@@ -146,9 +158,13 @@ CameraX Preview ユースケース
 
 ## 6. ライフサイクル・エラー・サーマル・その他
 
-- `dispose`: unbindAll → gl-still スレッド終了 → GL スレッドで EGL 資源解放 →
-  HandlerThread 終了 → `surfaceProducer.release()`。**解放順を厳守**
-  (EGL 解放前に Surface を release すると `eglSwapBuffers` がクラッシュする)。
+- `dispose` の解放順(**厳守**。implementation-notes #3 の FlutterJNI クラッシュ対策):
+  ① 描画停止フラグを**同期**セット(以後 `eglSwapBuffers` を発行しない)→
+  ② `surfaceProducer.release()`(エンジン側で遅延配送フレームをガード)→
+  ③ カメラ unbindAll・各リスナー解除 → ④ GL/EGL 資源解放(gl-still 含む)→ スレッド終了。
+  エンジン切断後にキュー済みフレームが配送されると
+  「FlutterJNI is not attached」で落ちるため、①②を必ず先頭で行い、
+  `onDetachedFromEngine` でも dispose を呼ぶこと。
 - エラー(カメラ切断等)は CameraX の `CameraState` を observe し EventChannel `error` へ。
 - **サーマル**: `PowerManager.addThermalStatusListener` を購読し EventChannel `thermal` へ変換。
   `THERMAL_STATUS_SEVERE` 以上で CameraX の `setTargetFrameRate(Range(24, 24))` 相当の

@@ -65,4 +65,4 @@ MIT License([LICENSE](LICENSE))。Copyright (c) 2026 Daisuke Sawada(daisuke7)
   - [x] T10 Android 写真保存(gl-stillスレッド+フル解像度フィルタ+MediaStore。実機検証: 見た目一致・向き・現代=無加工) — 2026-07-02
   - [x] T11 結合・ライフサイクル(background/復帰・wakelock_plus・SnackBar・Androidサーマル24fps降格。両実機で検証) — 2026-07-02
 - [ ] P1(磨き込み: レンズ切替・ズーム・デバッグ画面・メディアフレーム演出・チューニング)
-- [ ] ドキュメント凍結解除: implementation-notes #1〜#3 の docs への反映(P0 完了により可能)
+- [x] ドキュメント凍結解除: implementation-notes #1〜#3 を docs へ反映 — 2026-07-02

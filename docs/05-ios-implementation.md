@@ -148,6 +148,13 @@ CVPixelBuffer(カメラ, BGRA)
   `PHAssetCreationRequest.forAsset().addResource(with: .photo, data: jpegData)`。
 - Info.plist: `NSCameraUsageDescription`, `NSPhotoLibraryAddUsageDescription`,
   (P2) `NSMicrophoneUsageDescription`。
+- **permission_handler(SwiftPM)の注意**: カメラハンドラの有効/無効は、SwiftPM の
+  マニフェスト評価時に Info.plist の `NSCameraUsageDescription` の有無で決まる。
+  **キー追加より前にビルドしたことがある環境では評価結果がキャッシュされ、
+  権限ダイアログが出ず常に denied になる**。その場合は
+  `~/Library/Developer/Xcode/DerivedData` の当該プロジェクトと
+  `~/Library/Caches/org.swift.swiftpm/manifests` を削除して再ビルドする
+  (implementation-notes #1。新規クローン環境では発生しない)。
 - (P2) 録画: 07 参照。`AVAssetWriter` はこのクラスに実装する。
 
 ## 6. ライフサイクル・エラー・サーマル

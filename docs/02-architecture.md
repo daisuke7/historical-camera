@@ -115,7 +115,7 @@ class FilterParams {
 
 | メソッド | 引数 (Map) | 戻り値 | 説明 |
 |---------|-----------|--------|------|
-| `initialize` | `{"lens": "back"\|"front", "resolutionPreset": "hd720"\|"hd1080"}` | `{"textureId": int, "previewWidth": int, "previewHeight": int, "quarterTurns": int}` | カメラセッション構築→テクスチャ登録。**権限要求は Dart 側(permission_handler)が事前に行い**、ネイティブは権限状態を確認して未許可なら `CAMERA_PERMISSION_DENIED` を返すのみ。preview サイズは**センサー向き基準(横長)で固定**(§4.1)。quarterTurns は現在の表示回転 |
+| `initialize` | `{"lens": "back"\|"front", "resolutionPreset": "hd720"\|"hd1080"}` | `{"textureId": int, "previewWidth": int, "previewHeight": int, "quarterTurns": int}` | カメラセッション構築→テクスチャ登録。**権限要求は Dart 側(permission_handler)が事前に行い**、ネイティブは権限状態を確認して未許可なら `CAMERA_PERMISSION_DENIED` を返すのみ。preview サイズは**初期化時に確定し以後不変**(向きの扱いは §4.1: iOS はセンサー横長、Android は自然向き)。quarterTurns は現在の表示回転 |
 | `setFilterParams` | FilterParams の Map(§2) | `null` | 最新フィルタパラメータの差し替え |
 | `capturePhoto` | `{}` | `{"path": String, "width": int, "height": int}` | フル解像度静止画に現在の FilterParams を適用しギャラリー保存。戻りの path は**アプリ一時ディレクトリ内のファイルの絶対パス**(共有用。両 OS 共通の意味)。呼び出し中の多重呼び出しは `BAD_STATE` |
 | `startRecording` | `{}` | `null` | (P2) 録画開始。未実装フェーズでは `RECORDING_FAILED`/"not implemented" を返す |
@@ -181,27 +181,37 @@ textureId など整数は Android では Long で届くことに注意。
   EXIF(撮影日時・Orientation `.up`)付与 → ギャラリー保存。プレビューは止めない。
 - 録画(P2): プレビューと同じフィルタ済みフレームをエンコーダ入力へ分岐(07 参照)。
 
-### 4.1 回転モデル(両 OS 共通。厳守)
+### 4.1 回転モデル(P0 実装で実挙動に合わせて改訂)
 
-回転の扱いは実装事故が最も起きやすい箇所のため、次のモデルに固定する
-(公式 camera プラグインと同方式)。
+回転の扱いは実装事故が最も起きやすい箇所。次のモデルに固定する。
+不変条件は両 OS 共通、バッファの向きだけが OS で異なる(implementation-notes #3)。
 
-1. **プレビューバッファは常にセンサー向き(横長)固定。ネイティブはバッファを回転しない。**
-   出力テクスチャ・バッファプールの寸法は初期化時から不変であり、
-   `previewWidth/Height` も横長固定値を一度返すだけでよい。
-2. ネイティブはデバイス向きを監視し、変化時に `orientationChanged {quarterTurns}` を
-   Dart へ通知する。quarterTurns は「テクスチャを表示上正立させるために時計回りに
-   90°×N 回転させる数」(0..3)。フロントカメラのミラーはネイティブが吸収し、
-   quarterTurns の意味は前後カメラで同一とする。
+**不変条件(共通)**
+
+1. **出力バッファの寸法は初期化時に一度だけ決まり、以後不変。** 回転でバッファ・
+   プール・テクスチャを作り直さない。`previewWidth/Height` は初期化時に一度返すのみ。
+2. quarterTurns =「テクスチャを表示上正立させるために時計回りに 90°×N 回転させる数」
+   (0..3)。変化時に `orientationChanged {quarterTurns}` を Dart へ通知する。
+   フロントカメラのミラーはネイティブが吸収し、quarterTurns の意味は前後カメラで同一。
 3. **Dart 側は `RotatedBox(quarterTurns:)` で Texture を回転**し、
    `previewWidth:previewHeight` のアスペクト比を維持したまま `FittedBox(fit: cover)` で
    全画面表示する(04 §1.3)。
-4. シェーダーには uniform `orientation`(= quarterTurns, 0..3)を渡す。方向依存の
-   エフェクト(縦傷・版画の斜線・揺れ)は表示上の向きに合わせて描く(03 §3)。
-5. 静止画はフィルタ適用**前に**ネイティブがピクセルを正立向きへ回転し(このとき
-   `orientation` uniform は 0)、EXIF Orientation は `.up` を書く。
-   フロントカメラの静止画は**プレビューと同じ鏡像で保存**する(「撮れたものが
-   プレビューと一致」を優先)。
+4. シェーダーには uniform `orientation`(= quarterTurns)を渡し、方向依存エフェクト
+   (縦傷・版画の斜線)を表示上の向きに合わせる(03 §3)。
+5. 静止画はフィルタ適用**前に**正立ピクセルにし(`orientation` uniform は 0)、
+   EXIF Orientation は `.up`。フロントカメラの静止画は**プレビューと同じ鏡像で保存**。
+
+**バッファの向き(OS 別)**
+
+- **iOS**: バッファはセンサー向き(横長)のまま。ネイティブはバッファを回転しない。
+  quarterTurns はデバイス向きから算出(landscapeLeft=0, portrait=1, ...)。
+- **Android**: HAL がセンサー回転を SurfaceTexture の transform 行列に常時焼き込むため、
+  サンプル後のコンテンツは**自然向き(縦)で正立**になる。したがって出力バッファは
+  **回転後の寸法(例 960x1280)**で確保する。quarterTurns はディスプレイ回転の打ち消し
+  (`(-displayRotation/90) mod 4`)で、`DisplayManager.DisplayListener` で追従する。
+  CameraX の `preview.targetRotation` は**センサー向きに固定**する(targetRotation に
+  追従させると transform が変化し、固定寸法バッファでアスペクトが崩れるため)。
+  詳細は 06 §3.1/§3.3。
 
 ## 5. Flutter プロジェクト構成
 

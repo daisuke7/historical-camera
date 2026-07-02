@@ -105,7 +105,9 @@
    + Android Studio(Flutter/Dart プラグイン)
 2. iOS: Mac に Xcode をインストールし、`ios/Runner.xcworkspace` を一度開いて
    Signing & Capabilities で開発チームを設定(以後のビルドは
-   Android Studio / `flutter run` から可能)
+   Android Studio / `flutter run` から可能)。**Metal Toolchain(別コンポーネント・
+   約 700MB)も必要**: `xcodebuild -downloadComponent MetalToolchain`、
+   または Xcode > Settings > Components から
 3. 実機必須: カメラ・GPU 検証はシミュレータ/エミュレータでは不可能。
    iOS 1 台 + Android 1 台(できれば GPU 性能の異なる 2 台)を用意
 
@@ -121,6 +123,10 @@
 | 1000 年分の表現の単調さ(版画 1500-1840・絵巻 1000-1500 の各帯) | 体験の間延び | 主観評価 | hatchScale による線密度変化・顔料退色の漸増は 03 §2.1 で対応済み。不足ならキーフレーム追加とスケール配分(04 §2.1)の再調整 |
 
 ## 6. P0 実装中のドキュメント凍結運用
+
+> **凍結解除済み(2026-07-02)**: P0 完了に伴い凍結を解除し、implementation-notes
+> #1〜#3 を本文(01/02/03/05/06/08)へ反映済み。本セクションは P1 以降の
+> 同様の凍結運用のためのテンプレートとして残す。
 
 **P0 完了まで、本設計ドキュメント(docs/ 配下)は改訂しない。** これを成立させるための運用:
 
