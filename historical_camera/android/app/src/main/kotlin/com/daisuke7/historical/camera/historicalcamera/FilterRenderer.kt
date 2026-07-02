@@ -35,8 +35,9 @@ class FilterRenderer(
         private const val EGL_RECORDABLE_ANDROID = 0x3142
         private const val GL_TIME_ELAPSED_EXT = 0x88BF
 
-        // Fixed vertex stage (docs/03 §3.1), GLSL ES 3.0.
-        private const val VERTEX_SHADER = """#version 300 es
+        // Fixed vertex stage (docs/03 §3.1), GLSL ES 3.0. Shared with
+        // FilterBenchmark (docs/06 §9).
+        internal const val VERTEX_SHADER = """#version 300 es
 in vec4 aPosition;
 in vec2 aTexCoord;
 out vec2 vUV;

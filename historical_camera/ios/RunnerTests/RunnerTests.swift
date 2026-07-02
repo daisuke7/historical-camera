@@ -91,32 +91,14 @@ class RunnerTests: XCTestCase {
     }
   }
 
-  /// GPU budget check (docs/08 T6): worst-case parameter sets at 720p must
-  /// average under 8 ms per frame on the device GPU.
+  /// GPU budget check (docs/08 T6, T12): p90 frame time of the worst-case
+  /// parameter sets at 720p must stay under 8 ms on the device GPU.
+  /// Measurement goes through FilterBenchmark, the utility shared with the
+  /// 1080p unlock gate (docs/01 §1.1); the Android sibling is
+  /// FilterGpuBudgetTest (docs/06 §9).
   func testEraFilterGpuBudgetAt720p() throws {
-    guard let device = MTLCreateSystemDefaultDevice(),
-          let queue = device.makeCommandQueue(),
-          let library = device.makeDefaultLibrary(),
-          let function = library.makeFunction(name: "eraFilter"),
-          let pipeline = try? device.makeComputePipelineState(function: function)
-    else {
-      throw XCTSkip("Metal is unavailable in this test environment")
-    }
-
     let width = 1280
     let height = 720
-
-    let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-      pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
-    descriptor.usage = [.shaderRead]
-    let outDescriptor = MTLTextureDescriptor.texture2DDescriptor(
-      pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
-    outDescriptor.usage = [.shaderWrite]
-    guard let src = device.makeTexture(descriptor: descriptor),
-          let dst = device.makeTexture(descriptor: outDescriptor)
-    else {
-      return XCTFail("failed to create textures")
-    }
 
     // Worst case of the photo era (~year 1845: blur + halation + every
     // noise layer) and of the ink era (Sobel + posterize + paper).
@@ -151,40 +133,16 @@ class RunnerTests: XCTestCase {
     inkEra.paperTexture = 1.0
 
     for (label, params) in [("photoEra", photoEra), ("inkEra", inkEra)] {
-      var totalGpuSeconds = 0.0
-      let frames = 60
-      for frame in 0..<frames {
-        var uniforms = FilterUniforms(
-          params: params,
-          time: Float(frame) / 30.0,
-          width: Float(width),
-          height: Float(height),
-          orientation: 1)
-        guard let command = queue.makeCommandBuffer(),
-              let encoder = command.makeComputeCommandEncoder()
-        else {
-          return XCTFail("failed to create command buffer")
-        }
-        encoder.setComputePipelineState(pipeline)
-        encoder.setTexture(src, index: 0)
-        encoder.setTexture(dst, index: 1)
-        encoder.setBytes(
-          &uniforms, length: MemoryLayout<FilterUniforms>.stride, index: 0)
-        let threadsPerGroup = MTLSize(width: 16, height: 16, depth: 1)
-        let groups = MTLSize(
-          width: (width + 15) / 16, height: (height + 15) / 16, depth: 1)
-        encoder.dispatchThreadgroups(
-          groups, threadsPerThreadgroup: threadsPerGroup)
-        encoder.endEncoding()
-        command.commit()
-        command.waitUntilCompleted()
-        totalGpuSeconds += command.gpuEndTime - command.gpuStartTime
+      guard let times = FilterBenchmark.run(
+        width: width, height: height, params: params, frames: 60)
+      else {
+        throw XCTSkip("Metal is unavailable in this test environment")
       }
-      let averageMs = totalGpuSeconds / Double(frames) * 1000
-      print("eraFilter GPU avg (\(label), 720p): "
-        + String(format: "%.2f", averageMs) + " ms")
+      let p90 = FilterBenchmark.percentileMs(times, 90)
+      print("eraFilter GPU p90 (\(label), 720p): "
+        + String(format: "%.2f", p90) + " ms")
       XCTAssertLessThan(
-        averageMs, 8.0,
+        p90, 8.0,
         "eraFilter exceeds the 8 ms GPU budget for \(label)")
     }
   }
