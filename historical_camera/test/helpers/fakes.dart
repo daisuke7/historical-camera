@@ -89,6 +89,15 @@ class FakePermissionService implements PermissionService {
   Future<void> openAppSettings() async => openAppSettingsCalls++;
 }
 
+class FakeWakelockService implements WakelockService {
+  final states = <bool>[];
+
+  bool get enabled => states.isNotEmpty && states.last;
+
+  @override
+  Future<void> setEnabled(bool enabled) async => states.add(enabled);
+}
+
 const testNowYear = 2026;
 
 /// Wraps [child] in a ProviderScope whose camera providers are replaced by
@@ -98,6 +107,7 @@ Widget buildTestScope({
   required FakeNativeCameraApi api,
   required FakePermissionService permissions,
   required Widget child,
+  FakeWakelockService? wakelock,
   int nowYear = testNowYear,
 }) {
   return ProviderScope(
@@ -105,6 +115,8 @@ Widget buildTestScope({
       nowYearProvider.overrideWithValue(nowYear),
       nativeCameraApiProvider.overrideWithValue(api),
       permissionServiceProvider.overrideWithValue(permissions),
+      wakelockServiceProvider
+          .overrideWithValue(wakelock ?? FakeWakelockService()),
     ],
     child: child,
   );

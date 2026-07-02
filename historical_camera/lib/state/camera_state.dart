@@ -6,6 +6,7 @@ import 'package:flutter/services.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:permission_handler/permission_handler.dart' as ph;
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../domain/era_filter.dart';
 import '../platform/camera_event.dart';
@@ -77,8 +78,21 @@ class PermissionService {
   Future<void> openAppSettings() => ph.openAppSettings();
 }
 
+/// Thin wrapper around wakelock_plus so tests can substitute it
+/// (docs/04 §6: screen sleep is disabled while previewing).
+class WakelockService {
+  const WakelockService();
+
+  Future<void> setEnabled(bool enabled) =>
+      WakelockPlus.toggle(enable: enabled);
+}
+
 /// Current calendar year (docs/08 §6.4: `DateTime.now().year`).
 final nowYearProvider = Provider<int>((_) => DateTime.now().year);
+
+final wakelockServiceProvider = Provider<WakelockService>(
+  (_) => const WakelockService(),
+);
 
 final nativeCameraApiProvider = Provider<NativeCameraApi>(
   (_) => NativeCameraApi(),

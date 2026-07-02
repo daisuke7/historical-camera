@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:historical_camera/domain/era_filter.dart';
+import 'package:historical_camera/platform/camera_event.dart';
 import 'package:historical_camera/platform/native_camera_api.dart';
 import 'package:historical_camera/state/camera_state.dart';
 import 'package:historical_camera/strings.dart';
@@ -17,6 +18,7 @@ Future<
     ({
       FakeNativeCameraApi api,
       FakePermissionService permissions,
+      FakeWakelockService wakelock,
     })> pumpApp(
   WidgetTester tester, {
   bool granted = true,
@@ -24,12 +26,14 @@ Future<
 }) async {
   final api = FakeNativeCameraApi()..initializeErrorCode = initializeErrorCode;
   final permissions = FakePermissionService(granted: granted);
+  final wakelock = FakeWakelockService();
   await tester.pumpWidget(buildTestScope(
     api: api,
     permissions: permissions,
+    wakelock: wakelock,
     child: const MaterialApp(home: CameraScreen()),
   ));
-  return (api: api, permissions: permissions);
+  return (api: api, permissions: permissions, wakelock: wakelock);
 }
 
 CameraState stateOf(WidgetTester tester) {
@@ -134,6 +138,58 @@ void main() {
           .first,
     );
     expect(opacity.opacity, 0);
+  });
+
+  testWidgets('app lifecycle drives pause and resume (docs/02 §1)',
+      (tester) async {
+    final h = await pumpApp(tester);
+    await tester.pumpAndSettle();
+
+    tester.binding
+        .handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pumpAndSettle();
+    expect(h.api.calls, contains('pausePreview'));
+    expect(stateOf(tester).phase, CameraPhase.paused);
+
+    tester.binding
+        .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(h.api.calls, contains('resumePreview'));
+    expect(stateOf(tester).phase, CameraPhase.previewing);
+  });
+
+  testWidgets('wakelock follows the camera phase (docs/04 §6)',
+      (tester) async {
+    final h = await pumpApp(tester);
+    await tester.pumpAndSettle();
+    expect(h.wakelock.enabled, isTrue,
+        reason: 'previewing keeps the screen awake');
+
+    tester.binding
+        .handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pumpAndSettle();
+    expect(h.wakelock.enabled, isFalse,
+        reason: 'paused releases the wakelock');
+
+    tester.binding
+        .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(h.wakelock.enabled, isTrue);
+  });
+
+  testWidgets('transient native errors show a SnackBar', (tester) async {
+    final h = await pumpApp(tester);
+    await tester.pumpAndSettle();
+
+    h.api.eventsController
+        .add(const CameraEvent.error('CAMERA_UNAVAILABLE', 'interrupted'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.text('interrupted'), findsOneWidget);
+    // Preview keeps running behind the snackbar.
+    expect(stateOf(tester).phase, CameraPhase.previewing);
+    await tester.pump(const Duration(seconds: 5)); // let it dismiss
   });
 
   testWidgets('preview subtree does not rebuild during slider drags',

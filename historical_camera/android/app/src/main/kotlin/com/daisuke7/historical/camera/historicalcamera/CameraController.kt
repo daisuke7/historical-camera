@@ -11,11 +11,14 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.util.Log
+import android.util.Range
 import android.util.Size
 import android.view.OrientationEventListener
 import android.view.Surface
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
+import androidx.camera.core.SurfaceRequest
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -73,7 +76,15 @@ class CameraController(
     private var pendingInitResult: ((Result<Map<String, Any>>) -> Unit)? = null
     private var isFrontLens = false
     private var captureInFlight = false
+    private var resolutionSelector:
+        androidx.camera.core.resolutionselector.ResolutionSelector? = null
+    private var cameraSelector: CameraSelector? = null
+    private var isThrottled = false
     private val writerExecutor = Executors.newSingleThreadExecutor()
+
+    private companion object {
+        const val TAG = "HistoricalCamera"
+    }
 
     fun initialize(
         lens: String,
@@ -112,37 +123,11 @@ class CameraController(
                 val targetSize =
                     if (resolutionPreset == "hd1080") Size(1920, 1080)
                     else Size(1280, 720)
-                val resolutionSelector = ResolutionSelector.Builder()
+                resolutionSelector = ResolutionSelector.Builder()
                     .setResolutionStrategy(ResolutionStrategy(
                         targetSize,
                         ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
                     .build()
-
-                val preview = Preview.Builder()
-                    .setResolutionSelector(resolutionSelector)
-                    .build()
-                this.preview = preview
-
-                preview.setSurfaceProvider(mainExecutor) { request ->
-                    // request.resolution is the truth (docs/06 §3.2).
-                    val size = request.resolution
-                    request.setTransformationInfoListener(mainExecutor) { info ->
-                        onRotationDegrees(info.rotationDegrees)
-                    }
-                    // The transform matrix bakes in the sensor rotation, so
-                    // the visible content is natural-orientation upright; the
-                    // output buffer uses the rotated dimensions.
-                    val swap = (sensorRotationDegrees / 90) % 2 == 1
-                    val outSize =
-                        if (swap) Size(size.height, size.width) else size
-                    outputSize = outSize
-                    renderer.configure(
-                        size.width, size.height,
-                        outSize.width, outSize.height, mirror) { surface ->
-                        request.provideSurface(surface, mainExecutor) {}
-                        mainHandler.post { completeInitialize(outSize) }
-                    }
-                }
 
                 imageCapture = ImageCapture.Builder()
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
@@ -151,6 +136,11 @@ class CameraController(
                 val selector =
                     if (mirror) CameraSelector.DEFAULT_FRONT_CAMERA
                     else CameraSelector.DEFAULT_BACK_CAMERA
+                cameraSelector = selector
+
+                val preview = buildPreview(throttled = false)
+                this.preview = preview
+
                 val camera = provider.bindToLifecycle(
                     activity as LifecycleOwner, selector, preview, imageCapture)
                 sensorRotationDegrees = camera.cameraInfo.sensorRotationDegrees
@@ -170,6 +160,61 @@ class CameraController(
                     e.message ?: "camera initialization failed"))
             }
         }, mainExecutor)
+    }
+
+    private fun buildPreview(throttled: Boolean): Preview {
+        val builder = Preview.Builder()
+            .setResolutionSelector(requireNotNull(resolutionSelector))
+        if (throttled) {
+            // Thermal auto-downgrade to 24 fps (docs/02 §6.1).
+            builder.setTargetFrameRate(Range(15, 24))
+        }
+        val preview = builder.build()
+        preview.setSurfaceProvider(mainExecutor) { request ->
+            handleSurfaceRequest(request)
+        }
+        return preview
+    }
+
+    private fun handleSurfaceRequest(request: SurfaceRequest) {
+        val renderer = renderer ?: return
+        // request.resolution is the truth (docs/06 §3.2).
+        val size = request.resolution
+        request.setTransformationInfoListener(mainExecutor) { info ->
+            onRotationDegrees(info.rotationDegrees)
+        }
+        // The transform matrix bakes in the sensor rotation, so the visible
+        // content is natural-orientation upright; the output buffer uses the
+        // rotated dimensions (implementation-notes #3).
+        val swap = (sensorRotationDegrees / 90) % 2 == 1
+        val outSize = if (swap) Size(size.height, size.width) else size
+        outputSize = outSize
+        renderer.configure(
+            size.width, size.height,
+            outSize.width, outSize.height, isFrontLens) { surface ->
+            request.provideSurface(surface, mainExecutor) {}
+            mainHandler.post { completeInitialize(outSize) }
+        }
+    }
+
+    /** Rebinds the preview with/without the 24 fps thermal cap. */
+    private fun applyThermalFrameRate(throttled: Boolean) {
+        if (throttled == isThrottled) return
+        val provider = cameraProvider ?: return
+        val selector = cameraSelector ?: return
+        val old = preview ?: return
+        isThrottled = throttled
+        try {
+            provider.unbind(old)
+            val newPreview = buildPreview(throttled)
+            preview = newPreview
+            provider.bindToLifecycle(
+                activity as LifecycleOwner, selector, newPreview)
+            newPreview.targetRotation =
+                quartersToRotation(sensorRotationDegrees / 90)
+        } catch (e: Exception) {
+            Log.w(TAG, "thermal frame-rate rebind failed", e)
+        }
     }
 
     private fun completeInitialize(size: Size) {
@@ -337,11 +382,12 @@ class CameraController(
     fun resume() {
         val provider = cameraProvider ?: return
         val preview = preview ?: return
-        val imageCapture = imageCapture ?: return
+        val selector = cameraSelector ?: return
         if (!provider.isBound(preview)) {
             provider.bindToLifecycle(
-                activity as LifecycleOwner,
-                CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+                activity as LifecycleOwner, selector, preview)
+            preview.targetRotation =
+                quartersToRotation(sensorRotationDegrees / 90)
         }
     }
 
@@ -481,6 +527,8 @@ class CameraController(
                     else -> "nominal"
                 }
                 emitEvent(mapOf("type" to "thermal", "level" to level))
+                applyThermalFrameRate(
+                    status >= PowerManager.THERMAL_STATUS_SEVERE)
             }
             pm.addThermalStatusListener(mainExecutor, listener)
             thermalListener = listener

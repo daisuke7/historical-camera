@@ -52,7 +52,7 @@ MIT License([LICENSE](LICENSE))。Copyright (c) 2026 Daisuke Sawada(daisuke7)
 ## ステータス
 
 - [x] 設計フェーズ: 設計ドキュメント一式(docs/)作成済み — 2026-07-02
-- [ ] 実装フェーズ: P0 進行中(docs/08-implementation-plan.md のタスク分解に従う)
+- [x] 実装フェーズ: **P0 完了** — 2026-07-02(docs/08 §3 の受け入れ基準を両実機で充足)
   - [x] T1 Flutter プロジェクト雛形 — 2026-07-02
   - [x] T2 Dart ドメイン層(FilterParams/EraFilter/EraScale+単体テスト24件) — 2026-07-02
   - [x] T3 プラットフォーム層+状態管理(CameraEvent/NativeCameraApi/CameraNotifier+テスト25件) — 2026-07-02
@@ -63,4 +63,6 @@ MIT License([LICENSE](LICENSE))。Copyright (c) 2026 Daisuke Sawada(daisuke7)
   - [x] T8 Android パススルー(CameraX+GL ES3+SurfaceProducer。Pixel 6 実機で全向き・アスペクト・UI追従確認。回転モデルの実挙動は implementation-notes #3) — 2026-07-02
   - [x] T9 Android フィルタシェーダー(03 §3 の GLSL ES 3.0 移植、external/2D 2変種。実機検証: 年代変化・GPU 0.7〜5.6ms) — 2026-07-02
   - [x] T10 Android 写真保存(gl-stillスレッド+フル解像度フィルタ+MediaStore。実機検証: 見た目一致・向き・現代=無加工) — 2026-07-02
-  - [ ] T11 結合・ライフサイクル
+  - [x] T11 結合・ライフサイクル(background/復帰・wakelock_plus・SnackBar・Androidサーマル24fps降格。両実機で検証) — 2026-07-02
+- [ ] P1(磨き込み: レンズ切替・ズーム・デバッグ画面・メディアフレーム演出・チューニング)
+- [ ] ドキュメント凍結解除: implementation-notes #1〜#3 の docs への反映(P0 完了により可能)

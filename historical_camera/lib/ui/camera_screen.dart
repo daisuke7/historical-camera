@@ -20,7 +20,7 @@ class CameraScreen extends ConsumerStatefulWidget {
 }
 
 class _CameraScreenState extends ConsumerState<CameraScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _flash = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 120),
@@ -30,6 +30,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(cameraNotifierProvider.notifier).initialize();
     });
@@ -37,8 +38,24 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _flash.dispose();
     super.dispose();
+  }
+
+  /// Background/foreground drives pausePreview/resumePreview
+  /// (docs/02 §1 principle 4).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final notifier = ref.read(cameraNotifierProvider.notifier);
+    switch (state) {
+      case AppLifecycleState.paused:
+        notifier.pause();
+      case AppLifecycleState.resumed:
+        notifier.resume();
+      default:
+        break;
+    }
   }
 
   @override
@@ -49,6 +66,27 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       if (next != null && next != previous) {
         _flash.forward(from: 0);
       }
+    });
+
+    // Screen stays awake while the camera is live (docs/04 §6).
+    ref.listen(cameraNotifierProvider.select((s) => s.phase),
+        (previous, next) {
+      const active = {
+        CameraPhase.previewing,
+        CameraPhase.capturing,
+        CameraPhase.recording,
+      };
+      ref.read(wakelockServiceProvider).setEnabled(active.contains(next));
+    });
+
+    // Transient runtime errors surface as a SnackBar; the fatal path has its
+    // own full-screen view (docs/08 T11).
+    ref.listen(cameraNotifierProvider.select((s) => s.errorMessage),
+        (previous, next) {
+      if (next == null || next == previous) return;
+      if (ref.read(cameraNotifierProvider).phase == CameraPhase.error) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(next)));
     });
 
     final phase =
