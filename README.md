@@ -51,5 +51,5 @@ MIT License([LICENSE](LICENSE))。Copyright (c) 2026 Daisuke Sawada(daisuke7)
 - [ ] 実装フェーズ: P0 進行中(docs/08-implementation-plan.md のタスク分解に従う)
   - [x] T1 Flutter プロジェクト雛形 — 2026-07-02
   - [x] T2 Dart ドメイン層(FilterParams/EraFilter/EraScale+単体テスト24件) — 2026-07-02
-  - [ ] T3 プラットフォーム層+状態管理 / T4 UI /
-    T5〜T7 iOS / T8〜T10 Android / T11 結合
+  - [x] T3 プラットフォーム層+状態管理(CameraEvent/NativeCameraApi/CameraNotifier+テスト25件) — 2026-07-02
+  - [ ] T4 UI / T5〜T7 iOS / T8〜T10 Android / T11 結合
