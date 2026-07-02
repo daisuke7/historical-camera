@@ -26,7 +26,7 @@ class HistoricalCameraApp extends StatelessWidget {
   }
 }
 
-/// T4 で CameraScreen に置き換える起動時プレースホルダ。
+/// Boot-time placeholder; replaced by CameraScreen in task T4.
 class _PlaceholderScreen extends StatelessWidget {
   const _PlaceholderScreen();
 

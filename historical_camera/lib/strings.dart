@@ -1,4 +1,5 @@
-/// 表示文言の集約(02 §5)。将来の i18n に備え、UI 文字列は必ずここに置く。
+/// Central place for all user-facing strings (docs/02 §5).
+/// Keep every UI string here to ease future i18n.
 class Strings {
   Strings._();
 
