@@ -208,3 +208,20 @@ CameraX Preview ユースケース
 - SurfaceProducer(§3.1)でもプレビューが映らない場合の最終手段としてのみ、
   `AndroidManifest.xml` のメタデータで Impeller を無効化して切り分ける
   (恒久対応にはしない。Flutter 側の既知問題を確認して issue 対応する)。
+
+## 9. GPU 予算回帰テスト(P1。iOS 側の常設テストと対称にする)
+
+iOS には GPU 予算の常設回帰テスト(`RunnerTests.testEraFilterGpuBudgetAt720p`。
+implementation-notes #2 で常設化)があるが Android には無い。P1 チューニングでは
+シェーダー定数の変更が両 OS に及ぶため、着手前に instrumented test
+(`androidTest`、実機で `connectedAndroidTest` 実行)を常設する:
+
+- **内容**: 720p 級のオフスクリーン FBO に対し、代表年代(写真時代の最重量 1845 相当・
+  絵巻時代 1100 相当 — iOS テストと同じ年代セット)のパラメータで各 30 フレーム描画し、
+  **p90 GPU 時間 < 8ms** をアサートする。
+- **計測**: `EXT_disjoint_timer_query`(ES 3.0)。未対応機は `glFinish` 挟み込みの
+  CPU 計測で代用(保守側に倒れる)。この計測ユーティリティは 1080p 実測ゲート
+  (01 §1.1)と共用する。
+- **入力**: `sampler2D` 変種+ダミーテクスチャ(カメラ・OES 不要。GPU 負荷は等価)。
+- **実行環境**: エミュレータでは実行しない(GPU 性能が実機と無関係。§8 の注意とも同根)。
+  実機接続時のみ実行する。
