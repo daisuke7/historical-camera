@@ -53,4 +53,5 @@ MIT License([LICENSE](LICENSE))。Copyright (c) 2026 Daisuke Sawada(daisuke7)
   - [x] T2 Dart ドメイン層(FilterParams/EraFilter/EraScale+単体テスト24件) — 2026-07-02
   - [x] T3 プラットフォーム層+状態管理(CameraEvent/NativeCameraApi/CameraNotifier+テスト25件) — 2026-07-02
   - [x] T4 Flutter UI(CameraScreen/EraSlider/EraLabel/ShutterButton+widgetテスト7件) — 2026-07-02
-  - [ ] T5〜T7 iOS / T8〜T10 Android / T11 結合
+  - [x] T5 iOS パススルー(AVFoundation+Metal→Flutter Texture。実機で全画面プレビュー・回転・30fps確認) — 2026-07-02
+  - [ ] T6〜T7 iOS フィルタ/写真保存 / T8〜T10 Android / T11 結合

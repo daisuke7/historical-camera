@@ -16,6 +16,12 @@
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
+		BB1CAFE00000000000000001 /* HistoricalCameraPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1CAFE00000000000000001 /* HistoricalCameraPlugin.swift */; };
+		BB1CAFE00000000000000002 /* CameraController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1CAFE00000000000000002 /* CameraController.swift */; };
+		BB1CAFE00000000000000003 /* FilterRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1CAFE00000000000000003 /* FilterRenderer.swift */; };
+		BB1CAFE00000000000000004 /* FilterParams.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1CAFE00000000000000004 /* FilterParams.swift */; };
+		BB1CAFE00000000000000005 /* MediaWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1CAFE00000000000000005 /* MediaWriter.swift */; };
+		BB1CAFE00000000000000006 /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = AA1CAFE00000000000000006 /* Shaders.metal */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +65,12 @@
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AA1CAFE00000000000000001 /* HistoricalCameraPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoricalCameraPlugin.swift; sourceTree = "<group>"; };
+		AA1CAFE00000000000000002 /* CameraController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraController.swift; sourceTree = "<group>"; };
+		AA1CAFE00000000000000003 /* FilterRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterRenderer.swift; sourceTree = "<group>"; };
+		AA1CAFE00000000000000004 /* FilterParams.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterParams.swift; sourceTree = "<group>"; };
+		AA1CAFE00000000000000005 /* MediaWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaWriter.swift; sourceTree = "<group>"; };
+		AA1CAFE00000000000000006 /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -115,6 +127,7 @@
 		97C146F01CF9000F007C117D /* Runner */ = {
 			isa = PBXGroup;
 			children = (
+				CC1CAFE00000000000000001 /* HistoricalCamera */,
 				97C146FA1CF9000F007C117D /* Main.storyboard */,
 				97C146FD1CF9000F007C117D /* Assets.xcassets */,
 				97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */,
@@ -126,6 +139,19 @@
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 			);
 			path = Runner;
+			sourceTree = "<group>";
+		};
+		CC1CAFE00000000000000001 /* HistoricalCamera */ = {
+			isa = PBXGroup;
+			children = (
+				AA1CAFE00000000000000001 /* HistoricalCameraPlugin.swift */,
+				AA1CAFE00000000000000002 /* CameraController.swift */,
+				AA1CAFE00000000000000003 /* FilterRenderer.swift */,
+				AA1CAFE00000000000000004 /* FilterParams.swift */,
+				AA1CAFE00000000000000005 /* MediaWriter.swift */,
+				AA1CAFE00000000000000006 /* Shaders.metal */,
+			);
+			path = HistoricalCamera;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -284,6 +310,12 @@
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
+				BB1CAFE00000000000000001 /* HistoricalCameraPlugin.swift in Sources */,
+				BB1CAFE00000000000000002 /* CameraController.swift in Sources */,
+				BB1CAFE00000000000000003 /* FilterRenderer.swift in Sources */,
+				BB1CAFE00000000000000004 /* FilterParams.swift in Sources */,
+				BB1CAFE00000000000000005 /* MediaWriter.swift in Sources */,
+				BB1CAFE00000000000000006 /* Shaders.metal in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

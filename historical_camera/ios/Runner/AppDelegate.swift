@@ -12,5 +12,9 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    // In-app plugin, registered manually (docs/05 §2).
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "HistoricalCameraPlugin") {
+      HistoricalCameraPlugin.register(with: registrar)
+    }
   }
 }
