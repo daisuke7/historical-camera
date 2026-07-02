@@ -180,8 +180,9 @@ CameraX Preview ユースケース
   `onDetachedFromEngine` でも dispose を呼ぶこと。
 - エラー(カメラ切断等)は CameraX の `CameraState` を observe し EventChannel `error` へ。
 - **サーマル**: `PowerManager.addThermalStatusListener` を購読し EventChannel `thermal` へ変換。
-  `THERMAL_STATUS_SEVERE` 以上で CameraX の `setTargetFrameRate(Range(24, 24))` 相当の
-  再バインドを行い 24fps へ低減(02 §6.1)。
+  `THERMAL_STATUS_SEVERE` 以上で CameraX の `setTargetFrameRate(Range(15, 24))` の
+  再バインドを行い上限 24fps へ低減(02 §6.1。固定 `Range(24, 24)` は交渉に失敗する
+  端末があり得るため、下限 15 で幅を持たせる — P0 実装値)。
 - 画面スリープ抑止は Dart 側(wakelock_plus)の責務であり、本プラグインでは行わない。
 - `AndroidManifest.xml`: `<uses-permission android:name="android.permission.CAMERA"/>`、
   `<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"

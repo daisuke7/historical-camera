@@ -1,17 +1,10 @@
 # historical_camera
 
-A new Flutter project.
+年代遡りカメラ「Historical Camera」の Flutter アプリ本体。
 
-## Getting Started
+プロジェクト全体の説明・開発環境(Flutter バージョン固定、fvm、署名設定)・
+実装状況はリポジトリルートの [README.md](../README.md) を参照。
+設計ドキュメントは [docs/design.md](../docs/design.md) から。
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- ビルド・テストは常に `fvm flutter` / `fvm dart` を使う(バージョン固定 — ルート README)
+- iOS ビルドには `ios/Flutter/Local.xcconfig`(署名 Team ID。gitignore 済み)が必要
