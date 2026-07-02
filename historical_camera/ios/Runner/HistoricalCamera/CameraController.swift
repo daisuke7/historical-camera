@@ -30,6 +30,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
 
     private let sessionQueue = DispatchQueue(label: "historical_camera.session")
     private let captureQueue = DispatchQueue(label: "historical_camera.capture")
+    private let writerQueue = DispatchQueue(label: "historical_camera.writer")
 
     private var session: AVCaptureSession?
     private var videoDevice: AVCaptureDevice?
@@ -39,6 +40,9 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     private(set) var isInitialized = false
     private var currentQuarterTurns = 1
     private var observersInstalled = false
+    private var previewWidth = 1280
+    private var lensPosition: AVCaptureDevice.Position = .back
+    private var inFlightCapture: PhotoCaptureDelegate?
 
     init(
         textures: FlutterTextureRegistry,
@@ -201,6 +205,8 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         self.photoOutput = photoOutput
         self.renderer = renderer
         self.textureId = textureId
+        self.previewWidth = width
+        self.lensPosition = position
 
         session.startRunning()
         isInitialized = true
@@ -221,6 +227,137 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             "previewHeight": height,
             "quarterTurns": turns,
         ]
+    }
+
+    // MARK: - Still capture (docs/05 §3.4)
+
+    func capturePhoto(
+        completion: @escaping (Result<[String: Any], PluginError>) -> Void
+    ) {
+        sessionQueue.async {
+            guard self.isInitialized, let photoOutput = self.photoOutput else {
+                completion(.failure(PluginError(
+                    code: ErrorCodes.badState,
+                    message: "camera is not initialized")))
+                return
+            }
+            // Overlapping captures are BAD_STATE (docs/02 §3.1).
+            guard self.inFlightCapture == nil else {
+                completion(.failure(PluginError(
+                    code: ErrorCodes.badState,
+                    message: "a capture is already in progress")))
+                return
+            }
+
+            // Prefer uncompressed BGRA; fall back to encoded capture +
+            // decode on devices without BGRA photo support (docs/05 §3.4).
+            let bgra = kCVPixelFormatType_32BGRA
+            let settings: AVCapturePhotoSettings
+            if photoOutput.availablePhotoPixelFormatTypes.contains(bgra) {
+                settings = AVCapturePhotoSettings(format: [
+                    kCVPixelBufferPixelFormatTypeKey as String: bgra,
+                ])
+            } else {
+                settings = AVCapturePhotoSettings()
+            }
+            if #available(iOS 16.0, *) {
+                settings.maxPhotoDimensions = photoOutput.maxPhotoDimensions
+            } else {
+                settings.isHighResolutionPhotoEnabled = true
+            }
+
+            let turns = self.currentQuarterTurns
+            let mirror = self.lensPosition == .front
+            let delegate = PhotoCaptureDelegate { [weak self] photo, error in
+                guard let self else { return }
+                self.sessionQueue.async { self.inFlightCapture = nil }
+                self.writerQueue.async {
+                    self.processPhoto(
+                        photo: photo, error: error,
+                        quarterTurns: turns, mirror: mirror,
+                        completion: completion)
+                }
+            }
+            self.inFlightCapture = delegate
+            photoOutput.capturePhoto(with: settings, delegate: delegate)
+        }
+    }
+
+    /// Runs on the writer queue: rotate upright -> full-res filter -> JPEG ->
+    /// temp file + gallery save.
+    private func processPhoto(
+        photo: AVCapturePhoto?,
+        error: Error?,
+        quarterTurns: Int,
+        mirror: Bool,
+        completion: (Result<[String: Any], PluginError>) -> Void
+    ) {
+        guard error == nil, let photo, let renderer else {
+            completion(.failure(PluginError(
+                code: ErrorCodes.captureFailed,
+                message: error?.localizedDescription ?? "capture failed")))
+            return
+        }
+
+        var input = photo.pixelBuffer
+        if input == nil, let data = photo.fileDataRepresentation() {
+            input = MediaWriter.decodeToBGRA(data)
+        }
+        guard let pixelBuffer = input else {
+            completion(.failure(PluginError(
+                code: ErrorCodes.captureFailed,
+                message: "no pixel data in the captured photo")))
+            return
+        }
+
+        // Same params as the preview, with grain scaled to the still
+        // resolution (docs/03 §4).
+        var params = renderer.params
+        params.grainSize *= Float(CVPixelBufferGetWidth(pixelBuffer))
+            / Float(previewWidth)
+
+        guard let filtered = renderer.renderStill(
+            pixelBuffer, quarterTurns: quarterTurns, mirror: mirror,
+            params: params)
+        else {
+            completion(.failure(PluginError(
+                code: ErrorCodes.captureFailed,
+                message: "GPU still-render failed")))
+            return
+        }
+
+        let width = CVPixelBufferGetWidth(filtered)
+        let height = CVPixelBufferGetHeight(filtered)
+        guard let jpeg = MediaWriter.encodeJPEG(filtered, quality: 0.9),
+              let path = MediaWriter.writeTempFile(jpeg)
+        else {
+            completion(.failure(PluginError(
+                code: ErrorCodes.saveFailed,
+                message: "JPEG encoding failed")))
+            return
+        }
+
+        // Complete after the gallery save so the acceptance criterion
+        // "appears in the OS gallery" holds (docs/08 §3-4).
+        let semaphore = DispatchSemaphore(value: 0)
+        var saveResult: Result<Void, PluginError> = .success(())
+        MediaWriter.saveToPhotoLibrary(jpeg) { outcome in
+            saveResult = outcome
+            semaphore.signal()
+        }
+        semaphore.wait()
+
+        switch saveResult {
+        case .success:
+            emitEvent(["type": "photoSaved", "path": path])
+            completion(.success([
+                "path": path,
+                "width": width,
+                "height": height,
+            ]))
+        case .failure(let pluginError):
+            completion(.failure(pluginError))
+        }
     }
 
     // MARK: - Frame delivery (docs/05 §3.2)
@@ -320,5 +457,22 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             "code": ErrorCodes.cameraUnavailable,
             "message": error?.localizedDescription ?? "capture session error",
         ])
+    }
+}
+
+/// Retains the AVCapturePhotoCaptureDelegate for the duration of a capture.
+private final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
+    private let handler: (AVCapturePhoto?, Error?) -> Void
+
+    init(handler: @escaping (AVCapturePhoto?, Error?) -> Void) {
+        self.handler = handler
+    }
+
+    func photoOutput(
+        _ output: AVCapturePhotoOutput,
+        didFinishProcessingPhoto photo: AVCapturePhoto,
+        error: Error?
+    ) {
+        handler(error == nil ? photo : nil, error)
     }
 }

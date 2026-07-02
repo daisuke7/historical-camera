@@ -14,6 +14,14 @@ struct FilterUniforms {
     var orientation: Float
 }
 
+/// Must match `RotateUniforms` in Shaders.metal.
+struct RotateUniforms {
+    var dstWidth: UInt32
+    var dstHeight: UInt32
+    var quarterTurns: UInt32
+    var mirror: UInt32
+}
+
 /// GPU filter pipeline (docs/05 §4).
 ///
 /// camera CVPixelBuffer -> Metal texture (zero copy) -> eraFilter compute
@@ -22,11 +30,18 @@ final class FilterRenderer: NSObject, FlutterTexture {
     let width: Int
     let height: Int
 
+    private let device: MTLDevice
     private let commandQueue: MTLCommandQueue
     private let pipeline: MTLComputePipelineState
     private var textureCache: CVMetalTextureCache?
     private var pool: CVPixelBufferPool?
     private let startTime = CACurrentMediaTime()
+
+    // Still-photo path (docs/05 §3.4): its own command queue so a 12MP
+    // dispatch never blocks the preview queue. Accessed only from the
+    // controller's writer queue.
+    private var stillQueue: MTLCommandQueue?
+    private var rotatePipeline: MTLComputePipelineState?
 
     /// Protects latestBuffer / isRendering / params / orientation.
     private let lock = NSLock()
@@ -48,6 +63,7 @@ final class FilterRenderer: NSObject, FlutterTexture {
         else { return nil }
         self.width = width
         self.height = height
+        self.device = device
         self.commandQueue = queue
         self.pipeline = pipeline
         super.init()
@@ -80,6 +96,110 @@ final class FilterRenderer: NSObject, FlutterTexture {
     var orientation: Float {
         get { lock.lock(); defer { lock.unlock() }; return currentOrientation }
         set { lock.lock(); currentOrientation = newValue; lock.unlock() }
+    }
+
+    /// Preview clock, so still photos share the grain/scratch pattern of the
+    /// moment they were shot (docs/03 §4).
+    var currentTime: Float {
+        Float(fmod(CACurrentMediaTime() - startTime, 3600.0))
+    }
+
+    /// Full-resolution still pipeline (docs/05 §3.4): upright rotation (+
+    /// mirror for the front camera) followed by the same eraFilter kernel.
+    /// Synchronous; call from the writer queue. `params.grainSize` must
+    /// already be scaled by the caller (docs/03 §4).
+    func renderStill(
+        _ input: CVPixelBuffer,
+        quarterTurns: Int,
+        mirror: Bool,
+        params: FilterParams
+    ) -> CVPixelBuffer? {
+        if stillQueue == nil {
+            stillQueue = device.makeCommandQueue()
+        }
+        guard let queue = stillQueue,
+              let source = makeTexture(from: input)
+        else { return nil }
+
+        let turns = ((quarterTurns % 4) + 4) % 4
+        let srcW = CVPixelBufferGetWidth(input)
+        let srcH = CVPixelBufferGetHeight(input)
+        let outW = turns % 2 == 1 ? srcH : srcW
+        let outH = turns % 2 == 1 ? srcW : srcH
+
+        let bufferAttrs: [String: Any] = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferWidthKey as String: outW,
+            kCVPixelBufferHeightKey as String: outH,
+            kCVPixelBufferMetalCompatibilityKey as String: true,
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:] as [String: Any],
+        ]
+        var outBuffer: CVPixelBuffer?
+        guard CVPixelBufferCreate(
+            nil, outW, outH, kCVPixelFormatType_32BGRA,
+            bufferAttrs as CFDictionary, &outBuffer
+        ) == kCVReturnSuccess,
+            let output = outBuffer,
+            let destination = makeTexture(from: output),
+            let command = queue.makeCommandBuffer()
+        else { return nil }
+
+        var filterInput = source.metal
+
+        let needsRotate = turns != 0 || mirror
+        if needsRotate {
+            if rotatePipeline == nil,
+               let library = device.makeDefaultLibrary(),
+               let function = library.makeFunction(name: "rotateQuarter") {
+                rotatePipeline = try? device.makeComputePipelineState(function: function)
+            }
+            let midDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: .bgra8Unorm, width: outW, height: outH,
+                mipmapped: false)
+            midDescriptor.usage = [.shaderWrite, .shaderRead]
+            midDescriptor.storageMode = .private
+            guard let rotatePipeline,
+                  let mid = device.makeTexture(descriptor: midDescriptor),
+                  let encoder = command.makeComputeCommandEncoder()
+            else { return nil }
+            var rotate = RotateUniforms(
+                dstWidth: UInt32(outW), dstHeight: UInt32(outH),
+                quarterTurns: UInt32(turns), mirror: mirror ? 1 : 0)
+            encoder.setComputePipelineState(rotatePipeline)
+            encoder.setTexture(source.metal, index: 0)
+            encoder.setTexture(mid, index: 1)
+            encoder.setBytes(&rotate, length: MemoryLayout<RotateUniforms>.stride, index: 0)
+            let threadsPerGroup = MTLSize(width: 16, height: 16, depth: 1)
+            let groups = MTLSize(
+                width: (outW + 15) / 16, height: (outH + 15) / 16, depth: 1)
+            encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: threadsPerGroup)
+            encoder.endEncoding()
+            filterInput = mid
+        }
+
+        guard let encoder = command.makeComputeCommandEncoder() else { return nil }
+        var uniforms = FilterUniforms(
+            params: params,
+            time: currentTime,
+            width: Float(outW),
+            height: Float(outH),
+            orientation: 0 // the buffer is upright already (docs/03 §4)
+        )
+        encoder.setComputePipelineState(pipeline)
+        encoder.setTexture(filterInput, index: 0)
+        encoder.setTexture(destination.metal, index: 1)
+        encoder.setBytes(&uniforms, length: MemoryLayout<FilterUniforms>.stride, index: 0)
+        let threadsPerGroup = MTLSize(width: 16, height: 16, depth: 1)
+        let groups = MTLSize(
+            width: (outW + 15) / 16, height: (outH + 15) / 16, depth: 1)
+        encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: threadsPerGroup)
+        encoder.endEncoding()
+
+        command.commit()
+        command.waitUntilCompleted()
+        withExtendedLifetime((source.cv, destination.cv)) {}
+        guard command.error == nil else { return nil }
+        return output
     }
 
     /// Called on the capture queue for every camera frame. Drops the frame if

@@ -75,11 +75,15 @@ public final class HistoricalCameraPlugin: NSObject, FlutterPlugin, FlutterStrea
             controller.resume { mainResult(nil) }
 
         case "capturePhoto":
-            guard controller != nil else { return mainResult(badState()) }
-            mainResult(FlutterError(
-                code: ErrorCodes.captureFailed,
-                message: "not implemented until task T7", details: nil
-            ))
+            guard let controller else { return mainResult(badState()) }
+            controller.capturePhoto { outcome in
+                switch outcome {
+                case .success(let info):
+                    mainResult(info)
+                case .failure(let error):
+                    mainResult(error.flutterError)
+                }
+            }
 
         case "startRecording", "stopRecording":
             mainResult(FlutterError(

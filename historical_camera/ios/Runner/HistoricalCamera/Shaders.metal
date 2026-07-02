@@ -115,6 +115,44 @@ static float sobelLuma(
 }
 
 // ---------------------------------------------------------------------------
+// Still-photo pre-pass (docs/02 §4.1, 05 §3.4): rotates the sensor-oriented
+// photo buffer upright (clockwise 90° x quarterTurns) and optionally mirrors
+// the final image (front camera, to match the mirrored preview).
+// ---------------------------------------------------------------------------
+struct RotateUniforms {
+    uint dstWidth;
+    uint dstHeight;
+    uint quarterTurns;
+    uint mirror;
+};
+
+kernel void rotateQuarter(
+    texture2d<float, access::read> src [[texture(0)]],
+    texture2d<float, access::write> dst [[texture(1)]],
+    constant RotateUniforms &r [[buffer(0)]],
+    uint2 gid [[thread_position_in_grid]])
+{
+    if (gid.x >= r.dstWidth || gid.y >= r.dstHeight) {
+        return;
+    }
+    uint srcW = src.get_width();
+    uint srcH = src.get_height();
+    // Mirror flips the FINAL (display-space) image horizontally.
+    uint2 g = gid;
+    if (r.mirror != 0u) {
+        g.x = r.dstWidth - 1u - g.x;
+    }
+    uint2 s;
+    switch (r.quarterTurns) {
+        case 1u: s = uint2(g.y, srcH - 1u - g.x); break;
+        case 2u: s = uint2(srcW - 1u - g.x, srcH - 1u - g.y); break;
+        case 3u: s = uint2(srcW - 1u - g.y, g.x); break;
+        default: s = g; break;
+    }
+    dst.write(src.read(s), gid);
+}
+
+// ---------------------------------------------------------------------------
 // Era filter (docs/03 §3.3). Single pass; per-effect uniform branches are
 // coherent across threads and skip work at the modern end of the slider.
 // ---------------------------------------------------------------------------
