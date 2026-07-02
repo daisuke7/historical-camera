@@ -40,6 +40,10 @@
   `wakelock_plus ^1.6.1` / dev: `build_runner ^2.15.0` / `freezed ^3.2.5` /
   `mocktail ^1.0.5` / `flutter_lints ^6.0.0`
 - アプリ ID: **`com.daisuke7.historical.camera`**(iOS bundle id / Android applicationId・namespace で統一。Kotlin パッケージも同名)
+- iOS ビルドには **Xcode の Metal Toolchain** が必要(近年の Xcode では別コンポーネント)。
+  未インストールだと `.metal` のコンパイルで失敗する。インストール方法:
+  `xcodebuild -downloadComponent MetalToolchain`(約 700MB)、
+  または Xcode > Settings > Components から
 
 ## ライセンス
 
