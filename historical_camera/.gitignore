@@ -46,3 +46,6 @@ app.*.map.json
 
 # FVM Version Cache
 .fvm/
+
+# Local signing configuration (keeps the Team ID out of the repository)
+/ios/Flutter/Local.xcconfig

@@ -44,6 +44,11 @@
   未インストールだと `.metal` のコンパイルで失敗する。インストール方法:
   `xcodebuild -downloadComponent MetalToolchain`(約 700MB)、
   または Xcode > Settings > Components から
+- iOS 実機ビルドの署名: **Team ID はリポジトリに含めない**。
+  `historical_camera/ios/Flutter/Local.xcconfig`(gitignore 済み)を作成し
+  `DEVELOPMENT_TEAM = <あなたの Team ID>` を記述する(Debug/Release.xcconfig から
+  optional include される)。RunnerTests を実機実行する場合は
+  `xcodebuild test ... DEVELOPMENT_TEAM=<Team ID>` の上書き指定を使う
 
 ## ライセンス
 
