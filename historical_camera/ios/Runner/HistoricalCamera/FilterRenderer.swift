@@ -144,7 +144,7 @@ final class FilterRenderer: NSObject, FlutterTexture {
         encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: threadsPerGroup)
         encoder.endEncoding()
 
-        command.addCompletedHandler { [weak self] _ in
+        command.addCompletedHandler { [weak self] finished in
             // Keep the CVMetalTexture wrappers alive until the GPU is done.
             withExtendedLifetime((source.cv, destination.cv)) {}
             guard let self else { return }
@@ -152,6 +152,9 @@ final class FilterRenderer: NSObject, FlutterTexture {
             self.latestBuffer = output
             self.isRendering = false
             self.lock.unlock()
+            #if DEBUG
+            self.recordGpuTime(finished.gpuEndTime - finished.gpuStartTime)
+            #endif
             self.onFrameAvailable?()
         }
         command.commit()
@@ -184,6 +187,29 @@ final class FilterRenderer: NSObject, FlutterTexture {
         isRendering = false
         lock.unlock()
     }
+
+    #if DEBUG
+    // Rolling GPU-time report to verify the <8 ms budget (docs/08 T6) from
+    // `flutter run` logs without attaching Xcode.
+    private var gpuTimeSum: Double = 0
+    private var gpuFrameCount = 0
+
+    private func recordGpuTime(_ seconds: Double) {
+        lock.lock()
+        gpuTimeSum += seconds
+        gpuFrameCount += 1
+        let report = gpuFrameCount >= 120
+        let average = report ? gpuTimeSum / Double(gpuFrameCount) : 0
+        if report {
+            gpuTimeSum = 0
+            gpuFrameCount = 0
+        }
+        lock.unlock()
+        if report {
+            NSLog("eraFilter GPU avg: %.2f ms (last 120 frames)", average * 1000)
+        }
+    }
+    #endif
 
     private func makeTexture(
         from buffer: CVPixelBuffer
