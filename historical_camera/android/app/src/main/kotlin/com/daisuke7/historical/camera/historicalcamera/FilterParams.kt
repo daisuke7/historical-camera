@@ -28,6 +28,13 @@ data class FilterParams(
     val inkPainting: Float = 0f,
     val paperTexture: Float = 0f,
 ) {
+    /** Values in the docs/02 §2 declaration order, for `uniform float[20]`. */
+    fun toFloatArray(): FloatArray = floatArrayOf(
+        monochrome, sepia, saturation, contrast, brightness, warmth, fade,
+        grain, grainSize, vignette, scratches, dust, jitter, halation, blur,
+        orthochromatic, engraving, hatchScale, inkPainting, paperTexture,
+    )
+
     companion object {
         val NEUTRAL = FilterParams()
 

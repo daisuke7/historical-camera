@@ -207,6 +207,14 @@ class CameraController(
     }
 
     fun dispose(onDone: () -> Unit) {
+        // Ordering matters for the engine-detach race (FlutterJNI crash):
+        // 1) stop producing frames synchronously, 2) release the
+        // SurfaceProducer so the engine guards late images, 3) tear down
+        // camera and GL asynchronously.
+        renderer?.stopDrawing()
+        surfaceProducer?.release()
+        surfaceProducer = null
+
         orientationListener?.disable()
         orientationListener = null
         displayListener?.let {
@@ -229,18 +237,8 @@ class CameraController(
         val renderer = renderer
         this.renderer = null
         if (renderer != null) {
-            // Strict order (docs/06 §6): EGL teardown -> GL thread exit ->
-            // SurfaceProducer release.
-            renderer.release {
-                mainHandler.post {
-                    surfaceProducer?.release()
-                    surfaceProducer = null
-                    onDone()
-                }
-            }
+            renderer.release { mainHandler.post(onDone) }
         } else {
-            surfaceProducer?.release()
-            surfaceProducer = null
             onDone()
         }
     }
