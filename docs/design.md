@@ -19,7 +19,7 @@
 | 6 | [06-android-implementation.md](06-android-implementation.md) | Android ネイティブ層 (Kotlin) の実装詳細 |
 | 7 | [07-recording-feasibility.md](07-recording-feasibility.md) | 録画機能の実現可能性検討と設計(フェーズ2) |
 | 8 | [08-implementation-plan.md](08-implementation-plan.md) | 実装フェーズ、タスク分解、受け入れ基準、**ドキュメント凍結運用(§6)** |
-| - | [implementation-notes.md](implementation-notes.md) | 実装中の逸脱記録(追記式)。P0 中はドキュメントを直接修正せずここに記録する |
+| - | [implementation-notes.md](implementation-notes.md) | 実装中の逸脱記録(追記式)。凍結対象のドキュメントは直接修正せずここに記録する(08 §6) |
 
 ## LLM に実装させる場合の使い方
 
@@ -27,8 +27,9 @@
 2. タスクは `08-implementation-plan.md` のタスク分解単位で 1 つずつ与える。
 3. Dart 側のタスクには `03` `04` を、iOS タスクには `05` を、Android タスクには `06` を添付する。
 4. インターフェース(channel 名・メソッド名・パラメータ名)はドキュメントの記載を正とし、変更しないこと。
-5. P0 実装中は設計ドキュメントを修正しない。ドキュメントとの差分・曖昧さを見つけたら
-   `implementation-notes.md` に記録して実装を進めること(08 §6 の凍結運用)。
+5. 実装中は 08 §6 の凍結運用に従う。凍結対象のドキュメントとの差分・曖昧さを見つけたら
+   `implementation-notes.md` に記録して実装を進める(P1 の凍結範囲は 08 §6.5 —
+   チューニング対象値は凍結外)。
 
 ## 用語
 
