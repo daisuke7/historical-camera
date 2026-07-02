@@ -43,3 +43,11 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // CameraX (docs/06). Version pinned like the Dart packages (docs/02 §5.1).
+    val cameraxVersion = "1.4.2"
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+}

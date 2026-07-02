@@ -60,4 +60,5 @@ MIT License([LICENSE](LICENSE))。Copyright (c) 2026 Daisuke Sawada(daisuke7)
   - [x] T5 iOS パススルー(AVFoundation+Metal→Flutter Texture。実機で全画面プレビュー・回転・30fps確認) — 2026-07-02
   - [x] T6 iOS フィルタシェーダー(03 §3 の MSL 移植。実機検証: 年代変化・パススルーXCTest・GPU 5.3〜7.4ms@720p) — 2026-07-02
   - [x] T7 iOS 写真保存(フル解像度フィルタ適用+フォトライブラリ保存。実機検証: 見た目一致・向き・現代=無加工) — 2026-07-02
-  - [ ] T8〜T10 Android / T11 結合
+  - [x] T8 Android パススルー(CameraX+GL ES3+SurfaceProducer。Pixel 6 実機で全向き・アスペクト・UI追従確認。回転モデルの実挙動は implementation-notes #3) — 2026-07-02
+  - [ ] T9〜T10 Android フィルタ/写真保存 / T11 結合
