@@ -82,7 +82,9 @@ CameraX Preview ユースケース
    (`setTargetResolution` は非推奨)。
    `setSurfaceProvider { request -> request.provideSurface(Surface(surfaceTextureA), executor) {} }`。
    **`request.resolution` を正**とし、`surfaceTextureA.setDefaultBufferSize` と Dart へ返す
-   previewWidth/Height にこれを使う(リクエストと異なる値が来ることがある)。
+   previewWidth/Height にこれを使う(リクエストと異なる値が来ることがある。
+   アスペクト比も端末依存 — 02 §3.1。Pixel 6 実測では 1280×720 要求に対し
+   1280×960(4:3)が選ばれた)。
 3. `ImageCapture.Builder().setCaptureMode(CAPTURE_MODE_MAXIMIZE_QUALITY).build()`(静止画用)。
 4. `cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageCapture)`。
    LifecycleOwner は Activity(`ActivityAware` で取得)を使う。

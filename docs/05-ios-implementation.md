@@ -34,7 +34,11 @@ MediaWriter             … PHPhotoLibrary への保存。(P2) AVAssetWriter 録
    `CAMERA_PERMISSION_DENIED` を throw(権限要求は Dart 側が initialize 前に
    permission_handler で実施済み — 02 §3.1)。
 2. `AVCaptureSession` を生成し `sessionPreset = .hd1280x720`(`resolutionPreset` 引数で
-   `.hd1920x1080` に切替可)。
+   `.hd1920x1080` に切替可)。プリセット採用は「hd720 = 長辺≈1280 の要求」(02 §3.1)の
+   iOS 実装であり、結果として iOS は 16:9 になるが、アスペクトの OS 間一致は仕様ではない。
+   Dart へ返す previewWidth/Height は、プリセットが寸法を保証するため定数でよい
+   (P0 実装どおり)。プリセット以外のフォーマット指定へ移る場合は
+   `activeFormat.formatDescription.dimensions` から取ること。
 3. 入力: `AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back/.front)`。
 4. 出力1: `AVCaptureVideoDataOutput`
    - `videoSettings = [kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA]`

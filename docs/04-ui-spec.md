@@ -37,6 +37,9 @@
   `RotatedBox(quarterTurns:)` で包み、さらに `FittedBox(fit: BoxFit.cover)` で全画面カバー
   表示(アスペクト比が合わない分は切れてよい)。quarterTurns は `initialize` の戻り値を
   初期値とし、以後 `orientationChanged` イベントで更新する。
+  previewWidth:previewHeight のアスペクトは**端末依存の交渉結果**(16:9 とは限らない —
+  02 §3.1)。画面側のアスペクトも極端な縦長まで多様なため、UI はどの組合せでも
+  成立するように書く(cover 前提なのでレイアウト計算に実アスペクトを使わないこと)。
 - UI オーバーレイは `SafeArea` 内に配置。背景に半透明黒(α0.25)のグラデーションを
   スライダー帯・ボタン帯の背後に敷き、白 UI の視認性を確保する。
 - 回転: `OrientationBuilder` でレイアウト切替。プレビューの回転は上記 `RotatedBox` のみで
