@@ -115,9 +115,10 @@ EraSlider(
 
 ```
 [uninitialized]
-   → initialize() 呼び出し → [initializing]
+   → permission_handler でカメラ権限を要求(granted なら initialize() 呼び出し)→ [initializing]
        → 成功(textureId 受領) → [previewing]
        → 権限拒否 → [permissionDenied]   … 説明+「設定を開く」ボタンの全画面表示
+                                          (ボタンは permission_handler の openAppSettings())
        → 失敗 → [error]                  … メッセージ+再試行ボタン
 [previewing]
    → capturePhoto → [capturing](プレビュー継続・UI ロックのみ) → 完了 → [previewing]
@@ -125,7 +126,7 @@ EraSlider(
    → アプリ background / 非表示 → pausePreview → [paused] → 復帰 → resumePreview → [previewing]
 ```
 
-`CameraState`(ChangeNotifier)の保持フィールド:
+`CameraState`(Freezed。`CameraNotifier` が保持 — 02 §5)のフィールド:
 `phase`(上記列挙)、`year`(double)、`quantizedYear`(int)、`mode`(photo/video)、
 `textureId`、`previewSize`、`recordingElapsed`、`lastSavedPath`。
 
@@ -133,8 +134,8 @@ EraSlider(
 
 - 権限説明(iOS Info.plist / Android): 「昔の見た目を再現するためにカメラを使用します」等。
 - 対応言語: 初回は日本語のみ。文字列は 1 ファイル(`strings.dart`)に集約し将来の i18n に備える。
-- 画面スリープ: プレビュー中は無効化(wakelock)。ネイティブ側で
-  `isIdleTimerDisabled` / `FLAG_KEEP_SCREEN_ON` を制御(依存パッケージ削減のため)。
+- 画面スリープ: プレビュー中は `wakelock_plus` で無効化(previewing で enable、
+  paused / permissionDenied / error で disable)。
 
 ## 7. メディアフレーム演出(P1)
 

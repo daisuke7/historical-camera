@@ -23,14 +23,11 @@ MediaWriter             … MediaStore への保存。(P2) MediaRecorder 録画
 
 - `MainActivity` は `FlutterActivity` のまま、`configureFlutterEngine` で
   `flutterEngine.plugins.add(HistoricalCameraPlugin())` を手動登録。
-- `ActivityAware` を実装し、権限要求を `ActivityCompat.requestPermissions` +
-  `RequestPermissionsResultListener` で処理。要求する権限:
-  - `CAMERA`(initialize 時)
-  - `WRITE_EXTERNAL_STORAGE`(**API 28 以下のみ**・初回保存時に要求。マニフェストでは
-    `android:maxSdkVersion="28"` を付与)
-  - (P2) `RECORD_AUDIO`(録画モード初回選択時)
-- `openAppSettings`: `Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-  Uri.fromParts("package", packageName, null))` を起動。
+- `ActivityAware` を実装する(**用途は LifecycleOwner・Activity 参照の取得のみ**)。
+  権限要求(`CAMERA` / API 28 以下の `WRITE_EXTERNAL_STORAGE` / (P2) `RECORD_AUDIO`)と
+  アプリ設定画面遷移は **Dart 側(permission_handler)の責務**であり、本プラグインには
+  要求フローを実装しない。`initialize` 時は `ContextCompat.checkSelfPermission` で
+  権限状態のみ確認し、未許可なら `CAMERA_PERMISSION_DENIED` を返す。
 - `flutterPluginBinding.textureRegistry` を FilterRenderer に渡す。
 - メソッド分配は 02 §3.1 の表どおり。result はメインスレッドで返す。
 
@@ -156,7 +153,7 @@ CameraX Preview ユースケース
 - **サーマル**: `PowerManager.addThermalStatusListener` を購読し EventChannel `thermal` へ変換。
   `THERMAL_STATUS_SEVERE` 以上で CameraX の `setTargetFrameRate(Range(24, 24))` 相当の
   再バインドを行い 24fps へ低減(02 §6.1)。
-- 画面スリープ抑止: preview 中 `activity.window.addFlags(FLAG_KEEP_SCREEN_ON)`。
+- 画面スリープ抑止は Dart 側(wakelock_plus)の責務であり、本プラグインでは行わない。
 - `AndroidManifest.xml`: `<uses-permission android:name="android.permission.CAMERA"/>`、
   `<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
   android:maxSdkVersion="28"/>`、

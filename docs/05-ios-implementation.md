@@ -23,14 +23,16 @@ MediaWriter             … PHPhotoLibrary への保存。(P2) AVAssetWriter 録
   `FlutterEventChannel(name: "historical_camera/event")` を生成。
 - `registrar.textures()`(`FlutterTextureRegistry`)を FilterRenderer に渡す。
 - メソッド分配は 02 §3.1 の表どおり。**結果の result() 呼び出しは必ずメインスレッドで行う。**
-- `openAppSettings`: `UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)`。
+- 権限要求・アプリ設定画面遷移は Dart 側(permission_handler)の責務であり、
+  本プラグインには実装しない。
 
 ## 3. CameraController
 
 ### 3.1 セッション構築(`initialize`)
 
-1. `AVCaptureDevice.authorizationStatus(for: .video)` を確認。`.notDetermined` なら
-   `requestAccess` で要求。拒否なら `CAMERA_PERMISSION_DENIED` を throw。
+1. `AVCaptureDevice.authorizationStatus(for: .video)` を確認し、`.authorized` 以外なら
+   `CAMERA_PERMISSION_DENIED` を throw(権限要求は Dart 側が initialize 前に
+   permission_handler で実施済み — 02 §3.1)。
 2. `AVCaptureSession` を生成し `sessionPreset = .hd1280x720`(`resolutionPreset` 引数で
    `.hd1920x1080` に切替可)。
 3. 入力: `AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back/.front)`。
@@ -155,7 +157,7 @@ CVPixelBuffer(カメラ, BGRA)
   `thermal` に変換。`.serious` 以上で `activeVideoMinFrameDuration` を 1/24 秒に設定して
   24fps へ低減(1080p 動作中なら 720p 相当へ降格。02 §6.1)。
 - `dispose`: session 停止 → textureRegistry.unregisterTexture → Metal 資源解放。
-- 画面スリープ抑止: preview 中 `UIApplication.shared.isIdleTimerDisabled = true`。
+- 画面スリープ抑止は Dart 側(wakelock_plus)の責務であり、本プラグインでは行わない。
 
 ## 7. 実装順(このファイル内のマイルストーン)
 

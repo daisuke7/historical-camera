@@ -37,7 +37,7 @@
 | `CameraScreen` | Dart | 全画面 `Texture` + オーバーレイ UI の組み立て。縦横レイアウト切替、`RotatedBox` によるプレビュー回転(§4.1) |
 | `EraSlider` | Dart | 非線形年代スライダー widget。値は西暦年(10年量子化)で公開 |
 | `ShutterButton` | Dart | シャッター/録画モード切替付きボタン |
-| `CameraState` | Dart | アプリ状態(選択年、モード、録画中か、初期化状態、画面向き)。`ChangeNotifier` |
+| `CameraState` / `CameraNotifier` | Dart | アプリ状態(選択年、モード、録画中か、初期化状態、画面向き)。CameraState は Freezed の不変クラス、CameraNotifier は Riverpod の `Notifier<CameraState>` |
 | `EraFilter` | Dart | **純粋関数**: 西暦年 → `FilterParams`。キーフレームテーブルと補間(03 参照) |
 | `NativeCameraApi` | Dart | Platform Channel の型安全ラッパー。Dart 側で唯一 channel に触るクラス |
 | `CameraController`(native) | Swift/Kotlin | カメラセッション管理、フレーム供給、静止画キャプチャ |
@@ -49,8 +49,12 @@
 1. **ネイティブは「年代」を知らない。** 受け取るのは raw な `FilterParams` のみ。
 2. **FilterRenderer は 1 実装 3 用途。** プレビュー・静止画・録画で同一シェーダー/同一パラメータを使い、
    「撮れたものがプレビューと違う」事故を構造的に防ぐ。
-3. **状態管理は素の `ChangeNotifier` + `ListenableBuilder`。** 外部状態管理パッケージは使わない
-   (依存を減らし、低レベル LLM の実装ブレを防ぐ)。
+3. **状態管理は Riverpod(`flutter_riverpod`)、モデルは Freezed の不変クラス**(§5.1)。
+   パフォーマンス規約: `Texture` を含むプレビュー部は状態に依存させず一度だけ build し、
+   スライダー操作(60Hz)で再ビルドされるのは年代ラベルとスライダー自身のみとする
+   (`ref.watch(provider.select(...))` を使う。プレビュー全体の再ビルドは禁止)。
+   コード生成は Freezed のみ。riverpod_generator・flutter_hooks は使わない
+   (provider は手書きし、実装 LLM のブレ要因になる魔法を減らす)。
 4. ライフサイクル: アプリが background / 画面非表示になったら必ず `pausePreview`、
    復帰で `resumePreview`(GPU・カメラの無駄な占有と発熱を防ぐ)。Dart 側
    `WidgetsBindingObserver` で駆動する。
@@ -85,6 +89,10 @@ class FilterParams {
 }
 ```
 
+- **実装は Freezed**: `const factory FilterParams({...})` + private コンストラクタ
+  `const FilterParams._();` を持たせ、`toMap()`(キーはフィールド名と完全一致)・
+  `static FilterParams lerp(a, b, t)`・`static const neutral` をクラス内に定義する。
+  フィールド名・宣言順は上記コードを正とする(ネイティブの uniform 順もこの順)。
 - **中立値(= 無加工)の定義**: `saturation = contrast = grainSize = hatchScale = 1.0`、
   **他の 16 フィールドは 0.0**。`filter_params.dart` に `FilterParams.neutral` 定数として実装する。
 - **ネイティブ側の初期値は必ずこの中立値とする。** 最初の `setFilterParams` 受信までは
@@ -107,7 +115,7 @@ class FilterParams {
 
 | メソッド | 引数 (Map) | 戻り値 | 説明 |
 |---------|-----------|--------|------|
-| `initialize` | `{"lens": "back"\|"front", "resolutionPreset": "hd720"\|"hd1080"}` | `{"textureId": int, "previewWidth": int, "previewHeight": int, "quarterTurns": int}` | 権限確認→カメラセッション構築→テクスチャ登録。preview サイズは**センサー向き基準(横長)で固定**(§4.1)。quarterTurns は現在の表示回転 |
+| `initialize` | `{"lens": "back"\|"front", "resolutionPreset": "hd720"\|"hd1080"}` | `{"textureId": int, "previewWidth": int, "previewHeight": int, "quarterTurns": int}` | カメラセッション構築→テクスチャ登録。**権限要求は Dart 側(permission_handler)が事前に行い**、ネイティブは権限状態を確認して未許可なら `CAMERA_PERMISSION_DENIED` を返すのみ。preview サイズは**センサー向き基準(横長)で固定**(§4.1)。quarterTurns は現在の表示回転 |
 | `setFilterParams` | FilterParams の Map(§2) | `null` | 最新フィルタパラメータの差し替え |
 | `capturePhoto` | `{}` | `{"path": String, "width": int, "height": int}` | フル解像度静止画に現在の FilterParams を適用しギャラリー保存。戻りの path は**アプリ一時ディレクトリ内のファイルの絶対パス**(共有用。両 OS 共通の意味)。呼び出し中の多重呼び出しは `BAD_STATE` |
 | `startRecording` | `{}` | `null` | (P2) 録画開始。未実装フェーズでは `RECORDING_FAILED`/"not implemented" を返す |
@@ -116,8 +124,10 @@ class FilterParams {
 | `resumePreview` | `{}` | `null` | セッション再開 |
 | `setZoom` | `{"zoom": double}` | `null` | (任意・P1) 1.0〜maxZoom |
 | `switchLens` | `{"lens": "back"\|"front"}` | `{"textureId": int, "previewWidth": int, "previewHeight": int, "quarterTurns": int}` | (任意・P1) レンズ切替。textureId は変わり得る |
-| `openAppSettings` | `{}` | `null` | OS のアプリ設定画面を開く(iOS: `UIApplication.openSettingsURLString`、Android: `ACTION_APPLICATION_DETAILS_SETTINGS` + package URI の Intent)。permissionDenied 画面の「設定を開く」ボタンから呼ぶ |
 | `dispose` | `{}` | `null` | 全リソース解放 |
+
+OS のアプリ設定画面を開く操作(permissionDenied 画面の「設定を開く」)は自前メソッドではなく
+**permission_handler の `openAppSettings()`** を使う(§5.1)。
 
 **呼び出し順序の規約**: `initialize` の完了前に他メソッド(`dispose` を除く)を呼んだ場合、
 ネイティブは `BAD_STATE` を返す。`initialize` の 2 引数は必須・非 null
@@ -152,7 +162,9 @@ textureId など整数は Android では Long で届くことに注意。
   `Future<void> setFilterParams(FilterParams p)`, `Future<CapturedPhoto> capturePhoto()`, ...
 - `setFilterParams` は内部でスロットリング(直近送信から 16ms 未満なら最新値を保留し
   タイマーで送る。**必ず最後の値が送られること**)。
-- イベントは `Stream<CameraEvent>` として公開。
+- イベントは `Stream<CameraEvent>` として公開。CameraEvent は **Freezed の sealed union**
+  (`initialized` / `orientationChanged` / `photoSaved` / `thermal` / `recordingProgress` /
+  `error`)として定義し、switch 式で網羅チェックが効くようにする。
 
 ## 4. プレビュー描画の流れ(共通シーケンス)
 
@@ -195,20 +207,21 @@ textureId など整数は Android では Long で届くことに注意。
 
 ```
 historical_camera/
-├── pubspec.yaml            # 依存: 最小限。権限もネイティブで処理し Dart 依存ゼロを基本とする
+├── pubspec.yaml            # 依存は §5.1 の採用パッケージのみ
 ├── lib/
-│   ├── main.dart               # MaterialApp, 画面向き設定
+│   ├── main.dart               # ProviderScope + MaterialApp, 画面向き設定
 │   ├── strings.dart            # 表示文言の集約(将来の i18n に備える)
 │   ├── domain/
-│   │   ├── filter_params.dart  # FilterParams(§2) + toMap() + neutral 定数 + lerp
+│   │   ├── filter_params.dart  # FilterParams(§2。Freezed)+ toMap() + neutral + lerp
 │   │   ├── era_filter.dart     # 年代→FilterParams 変換(03 の実装)
 │   │   └── era_scale.dart      # スライダー位置↔西暦年の非線形変換(04 の実装)
 │   ├── platform/
+│   │   ├── camera_event.dart   # CameraEvent(Freezed sealed union — §3.3)
 │   │   └── native_camera_api.dart  # §3 のラッパー
 │   ├── state/
-│   │   └── camera_state.dart   # ChangeNotifier(選択年, モード, 録画状態, 初期化状態, 向き)
+│   │   └── camera_state.dart   # CameraState(Freezed)+ CameraNotifier + provider 定義
 │   └── ui/
-│       ├── camera_screen.dart  # 全体レイアウト(04)
+│       ├── camera_screen.dart  # 全体レイアウト(04)。ConsumerWidget
 │       ├── era_slider.dart
 │       ├── shutter_button.dart
 │       └── era_label.dart      # 現在年の大きな表示
@@ -229,8 +242,27 @@ historical_camera/
     └── MediaWriter.kt
 ```
 
-依存パッケージ方針: カメラ系プラグイン(`camera` 等)は**使わない**(パイプラインを
-自前ネイティブで持つため衝突する)。権限・設定画面遷移・wakelock もネイティブ側で処理する。
+### 5.1 採用パッケージ(この表以外は追加しない)
+
+知名度・安定性が高く、パフォーマンスを損なわず保守性を上げるものだけを採用する。
+
+| パッケージ | 用途 | 採用理由 |
+|-----------|------|---------|
+| `flutter_riverpod` | 状態管理・DI | コンパイルセーフ。`select` で再ビルド範囲を最小化(設計原則3)。テスト時の provider 差し替えが容易 |
+| `freezed` + `freezed_annotation` | 不変モデル(FilterParams / CameraState / CameraEvent) | copyWith・==・sealed union の boilerplate 削減。20 フィールドの手書きミスを排除 |
+| `permission_handler` | カメラ・マイク・(API28 以下)ストレージの権限要求、`openAppSettings()` | ネイティブの権限プラミング(特に Android の ActivityAware 経由の要求フロー)を丸ごと置き換え |
+| `wakelock_plus` | プレビュー中の画面スリープ防止 | ネイティブ両実装(isIdleTimerDisabled / FLAG_KEEP_SCREEN_ON)を置き換え |
+| `build_runner`(dev) | Freezed のコード生成 | — |
+| `flutter_lints`(dev) | 静的解析 | Flutter 標準 |
+| `mocktail`(dev) | テストのモック | null-safety 対応の事実上標準 |
+
+- **不採用と理由**: `camera`(自前パイプラインと衝突)/ `riverpod_generator`・
+  `flutter_hooks`(魔法・パラダイム追加は実装 LLM のブレ要因)/ `bloc`(Riverpod と重複)/
+  `go_router`(1 画面のため不要)/ `GetX`(設計方針と不一致)。
+- **バージョン方針**: プロジェクト開始時(T1)に各パッケージの最新 stable を確認して
+  `^` で pubspec に固定し、README に記録する(08 §4 の Flutter バージョン固定と同時に行う)。
+- カメラ・フィルタ・保存のパイプラインは引き続き自前ネイティブ(§1)。パッケージ採用は
+  Dart 層のみに影響し、Platform Channel API・ネイティブ実装には影響しない。
 
 ## 6. スレッド/キュー設計(ネイティブ共通)
 
