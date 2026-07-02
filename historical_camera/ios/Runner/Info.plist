@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>The camera is used to recreate how the scene would have looked in the past.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Used to save photos with the era filter applied.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

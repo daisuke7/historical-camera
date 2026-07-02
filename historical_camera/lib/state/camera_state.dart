@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/services.dart' show PlatformException;
+import 'package:flutter/services.dart'
+    show MissingPluginException, PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:permission_handler/permission_handler.dart' as ph;
@@ -144,6 +145,13 @@ class CameraNotifier extends Notifier<CameraState> {
             ? CameraPhase.permissionDenied
             : CameraPhase.error,
         errorMessage: e.message ?? e.code,
+      );
+    } on MissingPluginException {
+      // Native side not implemented yet (before tasks T5/T8): fail visibly
+      // instead of spinning forever.
+      state = state.copyWith(
+        phase: CameraPhase.error,
+        errorMessage: 'native camera plugin is not implemented yet',
       );
     }
   }
