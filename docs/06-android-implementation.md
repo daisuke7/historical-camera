@@ -102,9 +102,20 @@ CameraX Preview ユースケース
   `TransformationInfo` は診断用途のみに使う(固定後は常に 0 のはず)。
 - 静止画: `imageCapture.targetRotation` は物理向きへ追従させる
   (`OrientationEventListener`。CameraX が JPEG の EXIF を正しく付ける)。
-- **デバイス依存の注意**: 上記は「HAL が buffer transform を設定する」ことに依存する。
-  設定しない機種が存在する可能性があるため、新しいテスト機では回転検証
-  (08 T11 の 4 方向×プレビュー/保存写真)を必ず行うこと。
+- **デバイス依存の自己診断(P1)**: 上記は「HAL が buffer transform にセンサー回転を
+  焼き込む」ことに依存する。設定しない機種の存在に備え、最初の `updateTexImage()` 直後に
+  transform 行列の回転成分を検査する自己診断を実装する(現行モデルの維持が前提。
+  **自動切替は行わない**):
+  - `detectBakedQuarterTurns(matrix): Int?` — 4×4 行列の 2×2 回転部から 90° 単位の回転量を
+    判定する**純粋関数**(y-flip・クロップ由来のスケール/平行移動は正規化して無視。
+    90° 格子に乗らない行列は null)。合成行列(単位行列・y-flip のみ・90°回転+flip・
+    クロップ付き)でのユニットテストを必須とする。
+  - 判定結果がカメラの `sensorRotationDegrees` と矛盾する場合、`Log.w` で行列全体を出力し、
+    EventChannel `error`(code: `ROTATION_MODEL_MISMATCH`)を**一度だけ**送出する。
+    このコードは診断専用(非致命)であり、Dart は UI 状態を変えない(02 §3.2)。
+    プレビューは現行モデルのまま描画を継続する。
+  - 新しいテスト機での手動回転検証(08 T11 の 4 方向×プレビュー/保存写真)は引き続き実施し、
+    この診断は想定外機種の**検知を自動化**する位置づけとする。
 
 ### 3.4 静止画キャプチャ(`capturePhoto`)
 

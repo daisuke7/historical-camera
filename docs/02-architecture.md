@@ -145,7 +145,7 @@ textureId など整数は Android では Long で届くことに注意。
 | `photoSaved` | `path` | ギャラリー保存完了(capturePhoto の戻り後に非同期で来る場合あり) |
 | `thermal` | `level: String ("nominal"\|"fair"\|"serious"\|"critical")` | 端末の熱状態変化時(§6.1) |
 | `recordingProgress` | `elapsedMs: int` | (P2) 録画中 1 秒ごと |
-| `error` | `code`, `message` | 実行時エラー(セッション中断・ディスクフル等) |
+| `error` | `code`, `message` | 実行時エラー(セッション中断・ディスクフル等)。例外として `ROTATION_MODEL_MISMATCH`(Android の回転モデル自己診断 — 06 §3.3・P1)は**診断専用(非致命)**であり、Dart は UI 状態を変えずログ記録のみ行う |
 
 - **購読順序**: Dart は `initialize` を呼ぶ**前に** EventChannel の listen を開始すること。
   ネイティブは `onListen` 前に発生したイベントを破棄してよい(バッファリング不要)。
@@ -211,7 +211,8 @@ textureId など整数は Android では Long で届くことに注意。
   (`(-displayRotation/90) mod 4`)で、`DisplayManager.DisplayListener` で追従する。
   CameraX の `preview.targetRotation` は**センサー向きに固定**する(targetRotation に
   追従させると transform が変化し、固定寸法バッファでアスペクトが崩れるため)。
-  詳細は 06 §3.1/§3.3。
+  この焼き込み前提は HAL 依存のため、初回フレームで transform 行列を検査する自己診断を
+  P1 で入れる(06 §3.3)。詳細は 06 §3.1/§3.3。
 
 ## 5. Flutter プロジェクト構成
 
