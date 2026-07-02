@@ -73,8 +73,10 @@ MediaWriter             … PHPhotoLibrary への保存。(P2) AVAssetWriter 録
 
 1. `AVCapturePhotoSettings(format: [kCVPixelBufferPixelFormatTypeKey: BGRA])` で
    **無圧縮 BGRA の photo を要求**(事前に `photoOutput.availablePhotoPixelFormatTypes` に
-   BGRA が含まれることを確認。なければ `CAPTURE_FAILED`)。iOS 15 では
-   `isHighResolutionPhotoEnabled = true` も指定(§3.1)。
+   BGRA が含まれることを確認)。BGRA が使えない端末では JPEG でキャプチャし、
+   `photo.fileDataRepresentation()` → `CGImage` → BGRA の CVPixelBuffer にデコードして
+   同じパイプラインへ流す(フォールバック。`CAPTURE_FAILED` にはしない)。
+   iOS 15 では `isHighResolutionPhotoEnabled = true` も指定(§3.1)。
 2. delegate で `photo.pixelBuffer` を取得。**このバッファはセンサー向きのまま届く**
    (photo connection の向き設定は EXIF メタデータにしか影響しない)。
    `photo.metadata` の Orientation と §3.3 で保持した向きから回転量を決め、

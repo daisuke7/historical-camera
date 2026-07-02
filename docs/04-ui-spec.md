@@ -63,6 +63,8 @@ double yearForPosition(double p, int nowYear);   // 上表の区分線形補間
 double positionForYear(double year, int nowYear); // 逆変換(往復で誤差 <0.5 年をテスト)
 ```
 
+`nowYear` は実行時の西暦年(`DateTime.now().year`)。起動中の年またぎは考慮しない。
+
 ### 2.2 値の扱い
 
 - ドラッグ中: 連続値 `year` をそのまま `EraFilter` に渡す(見た目が滑らかに変化)。
@@ -73,8 +75,8 @@ double positionForYear(double year, int nowYear); // 逆変換(往復で誤差 <
   フィルタが滑らかにスナップ先へ追従するようにする(`onChangeEnd` はアニメ完了時ではなく
   指を離した瞬間に quantizedYear で 1 回発火)。
 - ハプティクス: 密度は表現の変化密度に合わせる。直近 100 年帯 = 10 年ごとに
-  `HapticFeedback.selectionClick` / 1500–1926 帯 = 50 年ごと / 1000–1500 帯 = 100 年ごと
-  (等間隔クリックだと圧縮帯で連射のブザーになるため)。
+  `HapticFeedback.selectionClick` / 1500–(now−100) 帯 = 50 年ごと / 1000–1500 帯 =
+  100 年ごと(等間隔クリックだと圧縮帯で連射のブザーになるため)。
   **メディア境界(1839: 写真の発明、1500: 版画↔絵巻)の通過時は `mediumImpact`**。
 - 目盛り: 100 年ごとに小さな目盛り線、1000/1500/1900/現在 にラベル。
 
