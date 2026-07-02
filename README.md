@@ -29,9 +29,26 @@
 | [docs/design.md](docs/design.md) | 設計ドキュメントの索引(ここから読む) |
 | docs/01〜08-*.md | 実現可能性考察・アーキテクチャ・フィルタ仕様・実装計画などの各論 |
 | [docs/prompts-history.md](docs/prompts-history.md) | 本プロジェクトに投入したプロンプトの記録 |
-| (未作成) `historical_camera/` | Flutter アプリ本体(実装フェーズで作成) |
+| `historical_camera/` | Flutter アプリ本体 |
+
+## 開発環境(バージョン固定 — docs/08 §4)
+
+- Flutter **3.44.4**(Dart 3.12.2)。**fvm で historical_camera/ にのみ固定**(`.fvmrc`)。
+  コマンドは常に `fvm flutter` / `fvm dart` を使うこと
+- 採用パッケージ(docs/02 §5.1。追加時のバージョン):
+  `flutter_riverpod ^3.3.2` / `freezed_annotation ^3.1.0` / `permission_handler ^12.0.3` /
+  `wakelock_plus ^1.6.1` / dev: `build_runner ^2.15.0` / `freezed ^3.2.5` /
+  `mocktail ^1.0.5` / `flutter_lints ^6.0.0`
+- アプリ ID: **`com.daisuke7.historical.camera`**(iOS bundle id / Android applicationId・namespace で統一。Kotlin パッケージも同名)
+
+## ライセンス
+
+MIT License([LICENSE](LICENSE))。Copyright (c) 2026 Daisuke Sawada(daisuke7)
 
 ## ステータス
 
 - [x] 設計フェーズ: 設計ドキュメント一式(docs/)作成済み — 2026-07-02
-- [ ] 実装フェーズ: 未着手(docs/08-implementation-plan.md のタスク T1 から開始予定)
+- [ ] 実装フェーズ: P0 進行中(docs/08-implementation-plan.md のタスク分解に従う)
+  - [x] T1 Flutter プロジェクト雛形 — 2026-07-02
+  - [ ] T2 Dart ドメイン層 / T3 プラットフォーム層+状態管理 / T4 UI /
+    T5〜T7 iOS / T8〜T10 Android / T11 結合
