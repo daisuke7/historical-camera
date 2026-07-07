@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../platform/camera_event.dart';
 
 import '../state/camera_state.dart';
 import '../strings.dart';
@@ -192,6 +196,20 @@ class _CameraOverlay extends StatelessWidget {
             ),
           ),
           const Align(
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: EdgeInsets.only(top: 96),
+              child: _ThermalNotice(),
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomLeft,
+            child: Padding(
+              padding: EdgeInsets.only(left: 16, bottom: EraSlider.height + 16),
+              child: const _SavedThumbnail(),
+            ),
+          ),
+          const Align(
             alignment: Alignment.centerRight,
             child: Padding(
               padding: EdgeInsets.only(right: 16),
@@ -288,6 +306,82 @@ class _EraSliderBar extends ConsumerWidget {
       nowYear: nowYear,
       onChanged: notifier.onYearChanged,
       onChangeEnd: notifier.onYearChangeEnd,
+    );
+  }
+}
+
+/// Bottom-left thumbnail of the last saved photo; tapping opens the OS
+/// photo app (docs/04 §4, P1). Hidden until the first capture.
+class _SavedThumbnail extends ConsumerWidget {
+  const _SavedThumbnail();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final path = ref.watch(
+      cameraNotifierProvider.select((s) => s.lastSavedPath),
+    );
+    if (path == null) return const SizedBox.shrink();
+
+    return GestureDetector(
+      key: const Key('saved_thumbnail'),
+      onTap: () => ref.read(cameraNotifierProvider.notifier).openGallery(),
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: Colors.black45,
+          border: Border.all(color: Colors.white70, width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Image.file(
+          File(path),
+          fit: BoxFit.cover,
+          // The temp file may already be gone (cache cleanup); keep the tap
+          // target with a placeholder instead of crashing.
+          errorBuilder: (_, _, _) =>
+              const Icon(Icons.photo, color: Colors.white54, size: 28),
+        ),
+      ),
+    );
+  }
+}
+
+/// Light warning while the device is thermally throttled (docs/02 §6.1:
+/// native downgrades automatically; Dart only informs).
+class _ThermalNotice extends ConsumerWidget {
+  const _ThermalNotice();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thermal = ref.watch(
+      cameraNotifierProvider.select((s) => s.thermal),
+    );
+    final visible = thermal == ThermalLevel.serious ||
+        thermal == ThermalLevel.critical;
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: const Duration(milliseconds: 300),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.black54,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.thermostat, color: Colors.orangeAccent, size: 16),
+              SizedBox(width: 6),
+              Text(
+                Strings.thermalNotice,
+                style: TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

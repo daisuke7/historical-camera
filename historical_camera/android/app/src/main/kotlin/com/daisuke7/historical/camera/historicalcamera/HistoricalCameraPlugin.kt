@@ -1,6 +1,8 @@
 package com.daisuke7.historical.camera.historicalcamera
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -205,6 +207,27 @@ class HistoricalCameraPlugin :
                 } else {
                     result.error(
                         ErrorCodes.BAD_STATE, "camera is not initialized", null)
+                }
+            }
+
+            "openGallery" -> {
+                // Saved-thumbnail tap (docs/04 §4). Camera-independent, so
+                // no controller/BAD_STATE check (docs/02 §3.1).
+                val activity = activity
+                if (activity == null) {
+                    result.error(
+                        ErrorCodes.CAMERA_UNAVAILABLE, "no activity", null)
+                    return
+                }
+                try {
+                    activity.startActivity(Intent(Intent.ACTION_VIEW).apply {
+                        type = "image/*"
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                    result.success(null)
+                } catch (e: ActivityNotFoundException) {
+                    result.error(
+                        ErrorCodes.CAMERA_UNAVAILABLE, "no gallery app", null)
                 }
             }
 

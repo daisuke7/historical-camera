@@ -156,6 +156,10 @@ class NativeCameraApi {
     return _previewInfoFromMap(map!);
   }
 
+  /// Opens the OS photo app; the saved-thumbnail tap action (docs/04 §4).
+  /// Camera-independent, callable before `initialize` (docs/02 §3.1).
+  Future<void> openGallery() => _method.invokeMethod<void>('openGallery');
+
   Future<void> dispose() {
     _cooldownTimer?.cancel();
     _cooldownTimer = null;

@@ -309,6 +309,15 @@ class CameraNotifier extends Notifier<CameraState> {
   Future<void> openAppSettings() =>
       ref.read(permissionServiceProvider).openAppSettings();
 
+  /// Saved-thumbnail tap: opens the OS photo app (docs/04 §4).
+  Future<void> openGallery() async {
+    try {
+      await _api.openGallery();
+    } on PlatformException catch (e) {
+      state = state.copyWith(errorMessage: e.message ?? e.code);
+    }
+  }
+
   int _quantize(double year) =>
       math.min(state.nowYear, (year / 10).round() * 10);
 

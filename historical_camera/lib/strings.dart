@@ -38,6 +38,9 @@ class Strings {
   static const boundaryPhotography = '1839 写真の発明';
   static const boundaryEngraving = '1500 版画の時代へ';
 
+  // Thermal notice (docs/02 §6.1; shown at serious and above).
+  static const thermalNotice = '端末が高温のため、画質を一時的に下げています';
+
   // Debug hidden panel (docs/04 §8).
   static const debugPanelTitle = 'フィルター調整';
   static const debugModeLinked = '年代連動';

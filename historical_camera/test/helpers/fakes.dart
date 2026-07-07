@@ -100,6 +100,9 @@ class FakeNativeCameraApi implements NativeCameraApi {
   }
 
   @override
+  Future<void> openGallery() async => calls.add('openGallery');
+
+  @override
   Future<void> dispose() async => calls.add('dispose');
 }
 

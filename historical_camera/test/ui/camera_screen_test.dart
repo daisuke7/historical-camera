@@ -107,6 +107,55 @@ void main() {
     expect(stateOf(tester).lastSavedPath, '/tmp/p.jpg');
   });
 
+  testWidgets('saved thumbnail appears after a capture and opens the '
+      'gallery on tap (docs/04 §4)', (tester) async {
+    final h = await pumpApp(tester);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('saved_thumbnail')), findsNothing,
+        reason: 'hidden until the first capture');
+
+    await tester.tap(find.byKey(const Key('shutter_button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('saved_thumbnail')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('saved_thumbnail')));
+    await tester.pumpAndSettle();
+    expect(h.api.calls, contains('openGallery'));
+  });
+
+  testWidgets('photoSaved event alone updates the thumbnail', (tester) async {
+    final h = await pumpApp(tester);
+    await tester.pumpAndSettle();
+
+    h.api.eventsController.add(const CameraEvent.photoSaved('/tmp/g.jpg'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('saved_thumbnail')), findsOneWidget);
+  });
+
+  testWidgets('thermal notice shows at serious and hides on recovery '
+      '(docs/02 §6.1)', (tester) async {
+    final h = await pumpApp(tester);
+    await tester.pumpAndSettle();
+
+    Widget notice() => tester.widget<AnimatedOpacity>(find
+        .ancestor(
+          of: find.text(Strings.thermalNotice),
+          matching: find.byType(AnimatedOpacity),
+        )
+        .first);
+    expect((notice() as AnimatedOpacity).opacity, 0,
+        reason: 'invisible while nominal');
+
+    h.api.eventsController.add(const CameraEvent.thermal(ThermalLevel.serious));
+    await tester.pumpAndSettle();
+    expect((notice() as AnimatedOpacity).opacity, 1);
+
+    h.api.eventsController.add(const CameraEvent.thermal(ThermalLevel.nominal));
+    await tester.pumpAndSettle();
+    expect((notice() as AnimatedOpacity).opacity, 0);
+  });
+
   testWidgets('lens switch button rebuilds the preview with the new lens',
       (tester) async {
     final h = await pumpApp(tester);

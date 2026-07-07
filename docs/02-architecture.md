@@ -125,12 +125,13 @@ class FilterParams {
 | `setZoom` | `{"zoom": double}` | `null` | (任意・P1) 1.0〜maxZoom |
 | `setDebugStatsEnabled` | `{"enabled": bool}` | `null` | (P1) デバッグ画面(04 §8)表示中のみ有効化。有効中はネイティブが `debugStats` イベントを 1 秒ごとに送出する。既定は無効(通常動作に計測オーバーヘッドを載せない) |
 | `switchLens` | `{"lens": "back"\|"front"}` | `{"textureId": int, "previewWidth": int, "previewHeight": int, "quarterTurns": int}` | (任意・P1) レンズ切替。textureId は変わり得る |
+| `openGallery` | `{}` | `null` | (P1) OS のフォトアプリ(ギャラリー)を開く。保存サムネイル(04 §4)のタップ動作。カメラ状態に依存せず `initialize` 前でも呼び出し可 |
 | `dispose` | `{}` | `null` | 全リソース解放 |
 
 OS のアプリ設定画面を開く操作(permissionDenied 画面の「設定を開く」)は自前メソッドではなく
 **permission_handler の `openAppSettings()`** を使う(§5.1)。
 
-**呼び出し順序の規約**: `initialize` の完了前に他メソッド(`dispose` を除く)を呼んだ場合、
+**呼び出し順序の規約**: `initialize` の完了前に他メソッド(`dispose`・`openGallery` を除く)を呼んだ場合、
 ネイティブは `BAD_STATE` を返す。`initialize` の 2 引数は必須・非 null
 (Dart ラッパー `NativeCameraApi` がデフォルト `lens:"back"`, `resolutionPreset:"hd720"` を補う)。
 textureId など整数は Android では Long で届くことに注意。

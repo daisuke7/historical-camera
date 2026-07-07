@@ -1,4 +1,5 @@
 import Flutter
+import UIKit
 
 /// Channel registration and method dispatch only (docs/05 §2).
 public final class HistoricalCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
@@ -132,6 +133,16 @@ public final class HistoricalCameraPlugin: NSObject, FlutterPlugin, FlutterStrea
                 mainResult(nil)
             } else {
                 mainResult(badState())
+            }
+
+        case "openGallery":
+            // Saved-thumbnail tap (docs/04 §4). Camera-independent, so no
+            // controller/BAD_STATE check (docs/02 §3.1).
+            DispatchQueue.main.async {
+                if let url = URL(string: "photos-redirect://") {
+                    UIApplication.shared.open(url)
+                }
+                result(nil)
             }
 
         case "startRecording", "stopRecording":
