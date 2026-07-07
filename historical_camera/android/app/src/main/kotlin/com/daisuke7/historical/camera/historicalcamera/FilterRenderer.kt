@@ -328,6 +328,14 @@ void main() {
     @Volatile
     var onDebugStats: ((Double) -> Unit)? = null
 
+    /**
+     * One-shot rotation-model self-diagnosis (docs/06 §3.3): invoked with a
+     * copy of the transform matrix right after the first drawn frame's
+     * updateTexImage(), then cleared.
+     */
+    @Volatile
+    var onFirstTransform: ((FloatArray) -> Unit)? = null
+
     @Volatile
     private var mirror = false
 
@@ -735,6 +743,11 @@ void main() {
         makeCurrent(windowSurface)
         surfaceTexture.updateTexImage()
         surfaceTexture.getTransformMatrix(texMatrix)
+
+        onFirstTransform?.let { diagnose ->
+            onFirstTransform = null
+            diagnose(texMatrix.copyOf())
+        }
 
         val timing = beginGpuTimer()
         // glFinish fallback (docs/06 §9): CPU timing, conservative — only

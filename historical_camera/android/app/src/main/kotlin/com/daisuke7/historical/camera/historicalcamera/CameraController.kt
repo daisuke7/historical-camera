@@ -42,6 +42,9 @@ object ErrorCodes {
     const val SAVE_FAILED = "SAVE_FAILED"
     const val RECORDING_FAILED = "RECORDING_FAILED"
     const val BAD_STATE = "BAD_STATE"
+
+    /** Diagnostic-only error event, never fatal (docs/02 §3.2, 06 §3.3). */
+    const val ROTATION_MODEL_MISMATCH = "ROTATION_MODEL_MISMATCH"
 }
 
 class PluginError(val code: String, override val message: String) : Exception(message)
@@ -143,6 +146,12 @@ class CameraController(
                 val camera = provider.bindToLifecycle(
                     activity as LifecycleOwner, selector, preview, imageCapture)
                 sensorRotationDegrees = camera.cameraInfo.sensorRotationDegrees
+
+                // Rotation-model self-diagnosis on the first frame
+                // (docs/06 §3.3): detection only, never auto-switching.
+                renderer.onFirstTransform = { matrix ->
+                    diagnoseRotationModel(matrix)
+                }
 
                 // CameraX bakes (sensor - targetRotation) into the buffer
                 // transform, which would squash the fixed-size texture.
@@ -458,6 +467,27 @@ class CameraController(
     }
 
     // MARK: Rotation (docs/02 §4.1, 06 §3.3)
+
+    /**
+     * Runs once on the first drawn frame (docs/06 §3.3): flags devices whose
+     * HAL does not bake the sensor rotation into the buffer transform the
+     * way the docs/02 §4.1 model assumes. Diagnostic only — one Log.w plus
+     * one non-fatal ROTATION_MODEL_MISMATCH event; the preview keeps
+     * rendering with the current model either way.
+     */
+    private fun diagnoseRotationModel(matrix: FloatArray) {
+        val detected = RotationDiagnosis.detectBakedQuarterTurns(matrix)
+        val expected = ((sensorRotationDegrees / 90) % 4 + 4) % 4
+        if (detected == expected) return
+        Log.w(TAG, "rotation model mismatch: expected $expected quarter " +
+            "turns (sensor=$sensorRotationDegrees deg), detected " +
+            "${detected ?: "off-grid"}; matrix=${matrix.joinToString()}")
+        emitEvent(mapOf(
+            "type" to "error",
+            "code" to ErrorCodes.ROTATION_MODEL_MISMATCH,
+            "message" to "expected $expected quarter turns, detected " +
+                "${detected ?: "off-grid"}"))
+    }
 
     private fun onRotationDegrees(degrees: Int) {
         // With targetRotation pinned to the sensor orientation this should

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart'
     show MissingPluginException, PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -267,6 +268,11 @@ class CameraNotifier extends Notifier<CameraState> {
       case RecordingProgressEvent(:final elapsedMs):
         state = state.copyWith(recordingElapsedMs: elapsedMs);
       case CameraErrorEvent(:final code, :final message):
+        if (code == CameraErrorCodes.rotationModelMismatch) {
+          // Diagnostic only (docs/02 §3.2): log, never touch UI state.
+          debugPrint('rotation model mismatch: $message');
+          break;
+        }
         state = state.copyWith(
           errorMessage: message.isEmpty ? code : message,
         );

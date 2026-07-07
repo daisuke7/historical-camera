@@ -58,6 +58,9 @@ dependencies {
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
 
+    // Rotation-model diagnosis unit tests (docs/06 §3.3).
+    testImplementation("junit:junit:4.13.2")
+
     // Instrumented GPU budget test (docs/06 §9).
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

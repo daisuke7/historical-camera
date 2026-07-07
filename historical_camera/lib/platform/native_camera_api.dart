@@ -13,6 +13,11 @@ abstract final class CameraErrorCodes {
   static const saveFailed = 'SAVE_FAILED';
   static const recordingFailed = 'RECORDING_FAILED';
   static const badState = 'BAD_STATE';
+
+  /// Diagnostic-only error event from the Android rotation-model
+  /// self-diagnosis (docs/02 §3.2, 06 §3.3). Never fatal: Dart logs it and
+  /// leaves the UI state untouched.
+  static const rotationModelMismatch = 'ROTATION_MODEL_MISMATCH';
 }
 
 /// Result of `initialize` / `switchLens` (docs/02 §3.1). Preview dimensions

@@ -225,6 +225,23 @@ void main() {
       // Runtime error events do not kill the preview.
       expect(state.phase, CameraPhase.previewing);
     });
+
+    test('ROTATION_MODEL_MISMATCH is diagnostic-only (docs/02 §3.2)',
+        () async {
+      final h = makeHarness();
+      final notifier = h.container.read(cameraNotifierProvider.notifier);
+      await notifier.initialize();
+
+      h.api.eventsController.add(const CameraEvent.error(
+          CameraErrorCodes.rotationModelMismatch,
+          'expected 1 quarter turns, detected off-grid'));
+      await pumpEvents();
+
+      final state = h.container.read(cameraNotifierProvider);
+      expect(state.errorMessage, isNull,
+          reason: 'the diagnostic must not surface in the UI');
+      expect(state.phase, CameraPhase.previewing);
+    });
   });
 
   group('mode & settings', () {
