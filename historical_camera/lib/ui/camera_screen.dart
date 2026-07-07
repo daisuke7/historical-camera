@@ -9,6 +9,7 @@ import '../state/camera_state.dart';
 import '../strings.dart';
 import 'debug_panel.dart';
 import 'era_label.dart';
+import 'media_frame.dart';
 import 'era_slider.dart';
 import 'shutter_button.dart';
 
@@ -109,6 +110,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               // Behind the overlay UI so buttons/slider win their gestures;
               // pinches on bare preview areas drive the zoom (docs/08 T16).
               const _ZoomGestureLayer(),
+              // Era media frame (docs/04 §7); IgnorePointer, so gestures
+              // fall through to the zoom layer.
+              const MediaFrameOverlay(),
               const _CameraOverlay(),
               // Hidden tuning panel / manual badge (docs/04 §8).
               const DebugPanelHost(),
