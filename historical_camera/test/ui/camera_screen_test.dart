@@ -107,6 +107,41 @@ void main() {
     expect(stateOf(tester).lastSavedPath, '/tmp/p.jpg');
   });
 
+  testWidgets('lens switch button rebuilds the preview with the new lens',
+      (tester) async {
+    final h = await pumpApp(tester);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('lens_switch_button')));
+    await tester.pumpAndSettle();
+
+    expect(h.api.lastLens, 'front');
+    expect(stateOf(tester).lens, 'front');
+    expect(stateOf(tester).phase, CameraPhase.previewing);
+    expect(stateOf(tester).textureId, 8,
+        reason: 'the UI must adopt the new texture id (docs/02 §3.1)');
+  });
+
+  testWidgets('pinch on the preview drives setZoom', (tester) async {
+    final h = await pumpApp(tester);
+    await tester.pumpAndSettle();
+
+    final center = tester.getCenter(find.byType(CameraScreen));
+    final finger1 = await tester.startGesture(center - const Offset(30, 0));
+    final finger2 = await tester.startGesture(center + const Offset(30, 0));
+    await tester.pump();
+    await finger1.moveBy(const Offset(-60, 0));
+    await finger2.moveBy(const Offset(60, 0));
+    await tester.pump();
+    await finger1.up();
+    await finger2.up();
+    await tester.pump();
+
+    final zoom = stateOf(tester).zoom;
+    expect(zoom, greaterThan(1.0));
+    expect(h.api.lastZoom, zoom);
+  });
+
   testWidgets('slider drag updates year, pushes params, then snaps',
       (tester) async {
     final h = await pumpApp(tester);

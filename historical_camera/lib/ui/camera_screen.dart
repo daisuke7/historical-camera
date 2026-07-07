@@ -102,6 +102,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             fit: StackFit.expand,
             children: [
               const _PreviewLayer(),
+              // Behind the overlay UI so buttons/slider win their gestures;
+              // pinches on bare preview areas drive the zoom (docs/08 T16).
+              const _ZoomGestureLayer(),
               const _CameraOverlay(),
               // Hidden tuning panel / manual badge (docs/04 §8).
               const DebugPanelHost(),
@@ -215,14 +218,59 @@ class _ShutterArea extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final phase =
         ref.watch(cameraNotifierProvider.select((s) => s.phase));
-    return ShutterButton(
-      key: const Key('shutter_button'),
-      enabled: phase == CameraPhase.previewing,
-      onPressed: () =>
-          ref.read(cameraNotifierProvider.notifier).capturePhoto(),
-    );
+    final previewing = phase == CameraPhase.previewing;
     // Video mode stays hidden until P2 (docs/04 §4), so there is no mode
-    // segment in P0.
+    // segment; the lens switch (P1, docs/08 T16) takes the spot below the
+    // shutter instead.
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ShutterButton(
+          key: const Key('shutter_button'),
+          enabled: previewing,
+          onPressed: () =>
+              ref.read(cameraNotifierProvider.notifier).capturePhoto(),
+        ),
+        const SizedBox(height: 12),
+        IconButton(
+          key: const Key('lens_switch_button'),
+          onPressed: previewing
+              ? () => ref.read(cameraNotifierProvider.notifier).switchLens()
+              : null,
+          icon: const Icon(Icons.cameraswitch,
+              color: Colors.white, size: 28),
+        ),
+      ],
+    );
+  }
+}
+
+/// Full-screen pinch handler behind the overlay UI (docs/08 T16).
+class _ZoomGestureLayer extends ConsumerStatefulWidget {
+  const _ZoomGestureLayer();
+
+  @override
+  ConsumerState<_ZoomGestureLayer> createState() => _ZoomGestureLayerState();
+}
+
+class _ZoomGestureLayerState extends ConsumerState<_ZoomGestureLayer> {
+  double _baseZoom = 1.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onScaleStart: (_) =>
+          _baseZoom = ref.read(cameraNotifierProvider).zoom,
+      onScaleUpdate: (details) {
+        // Single-pointer pans reach here too (scale stays 1); only real
+        // pinches change the zoom.
+        if (details.pointerCount < 2) return;
+        ref
+            .read(cameraNotifierProvider.notifier)
+            .setZoom(_baseZoom * details.scale);
+      },
+    );
   }
 }
 

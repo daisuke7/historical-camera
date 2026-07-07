@@ -244,6 +244,70 @@ void main() {
     });
   });
 
+  group('lens switch & zoom (docs/08 T16)', () {
+    test('switchLens toggles the lens, adopts the new texture and re-sends '
+        'the era params', () async {
+      final h = makeHarness();
+      final notifier = h.container.read(cameraNotifierProvider.notifier);
+      await notifier.initialize();
+      notifier.onYearChanged(1950);
+      notifier.setZoom(3.0);
+
+      await notifier.switchLens();
+
+      final state = h.container.read(cameraNotifierProvider);
+      expect(h.api.lastLens, 'front');
+      expect(state.lens, 'front');
+      expect(state.phase, CameraPhase.previewing);
+      expect(state.textureId, 8, reason: 'the texture id may change');
+      expect(state.zoom, 1.0, reason: 'a rebuilt session starts unzoomed');
+      expect(h.api.lastParams, paramsForYear(1950, testNowYear),
+          reason: 'the fresh session starts neutral and must be re-synced');
+
+      await notifier.switchLens();
+      expect(h.api.lastLens, 'back');
+      expect(h.container.read(cameraNotifierProvider).lens, 'back');
+    });
+
+    test('switchLens failure surfaces the error phase', () async {
+      final h = makeHarness();
+      final notifier = h.container.read(cameraNotifierProvider.notifier);
+      await notifier.initialize();
+
+      h.api.switchLensError = PlatformException(
+          code: CameraErrorCodes.cameraUnavailable, message: 'no front cam');
+      await notifier.switchLens();
+
+      final state = h.container.read(cameraNotifierProvider);
+      expect(state.phase, CameraPhase.error);
+      expect(state.errorMessage, 'no front cam');
+    });
+
+    test('setZoom clamps to the UI bound and reaches native', () async {
+      final h = makeHarness();
+      final notifier = h.container.read(cameraNotifierProvider.notifier);
+      await notifier.initialize();
+
+      notifier.setZoom(2.5);
+      expect(h.container.read(cameraNotifierProvider).zoom, 2.5);
+      expect(h.api.lastZoom, 2.5);
+
+      notifier.setZoom(99.0);
+      expect(h.container.read(cameraNotifierProvider).zoom,
+          CameraNotifier.maxUiZoom);
+      expect(h.api.lastZoom, CameraNotifier.maxUiZoom);
+
+      notifier.setZoom(0.2);
+      expect(h.container.read(cameraNotifierProvider).zoom, 1.0);
+    });
+
+    test('setZoom is ignored outside previewing', () {
+      final h = makeHarness();
+      h.container.read(cameraNotifierProvider.notifier).setZoom(2.0);
+      expect(h.api.lastZoom, isNull);
+    });
+  });
+
   group('mode & settings', () {
     test('setMode switches shutter mode', () {
       final h = makeHarness();

@@ -81,6 +81,8 @@ class CameraController(
     private var captureInFlight = false
     private var resolvedPreset = "hd720"
     private var cameraSelector: CameraSelector? = null
+    private var boundCamera: androidx.camera.core.Camera? = null
+    private var currentZoom = 1f
     private var isThrottled = false
     private val writerExecutor = Executors.newSingleThreadExecutor()
 
@@ -145,6 +147,7 @@ class CameraController(
 
                 val camera = provider.bindToLifecycle(
                     activity as LifecycleOwner, selector, preview, imageCapture)
+                boundCamera = camera
                 sensorRotationDegrees = camera.cameraInfo.sensorRotationDegrees
 
                 // Rotation-model self-diagnosis on the first frame
@@ -235,10 +238,13 @@ class CameraController(
             provider.unbind(old)
             val newPreview = buildPreview(throttled)
             preview = newPreview
-            provider.bindToLifecycle(
+            val camera = provider.bindToLifecycle(
                 activity as LifecycleOwner, selector, newPreview)
             newPreview.targetRotation =
                 quartersToRotation(sensorRotationDegrees / 90)
+            boundCamera = camera
+            // Rebinding resets the zoom ratio; restore the user's pinch.
+            if (currentZoom > 1f) camera.cameraControl.setZoomRatio(currentZoom)
         } catch (e: Exception) {
             Log.w(TAG, "thermal frame-rate rebind failed", e)
         }
@@ -282,6 +288,20 @@ class CameraController(
         val renderer = renderer ?: return false
         if (!isInitialized) return false
         renderer.debugStatsEnabled = enabled
+        return true
+    }
+
+    /**
+     * Pinch zoom (docs/02 §3.1 setZoom, P1). Clamped to the device range;
+     * the zoom ratio applies to ImageCapture as well, so saved photos match
+     * the preview framing.
+     */
+    fun setZoom(zoom: Double): Boolean {
+        if (!isInitialized) return false
+        val camera = boundCamera ?: return false
+        val max = camera.cameraInfo.zoomState.value?.maxZoomRatio ?: 1f
+        currentZoom = zoom.toFloat().coerceIn(1f, max)
+        camera.cameraControl.setZoomRatio(currentZoom)
         return true
     }
 
@@ -421,10 +441,12 @@ class CameraController(
         val preview = preview ?: return
         val selector = cameraSelector ?: return
         if (!provider.isBound(preview)) {
-            provider.bindToLifecycle(
+            val camera = provider.bindToLifecycle(
                 activity as LifecycleOwner, selector, preview)
             preview.targetRotation =
                 quartersToRotation(sensorRotationDegrees / 90)
+            boundCamera = camera
+            if (currentZoom > 1f) camera.cameraControl.setZoomRatio(currentZoom)
         }
     }
 
@@ -453,6 +475,7 @@ class CameraController(
         thermalListener = null
         cameraProvider?.unbindAll()
         cameraProvider = null
+        boundCamera = null
         preview = null
         imageCapture = null
         isInitialized = false

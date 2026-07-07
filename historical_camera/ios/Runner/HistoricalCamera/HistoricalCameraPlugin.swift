@@ -5,6 +5,7 @@ public final class HistoricalCameraPlugin: NSObject, FlutterPlugin, FlutterStrea
     private let textures: FlutterTextureRegistry
     private var controller: CameraController?
     private var eventSink: FlutterEventSink?
+    private var lastResolutionPreset = "auto"
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         let instance = HistoricalCameraPlugin(textures: registrar.textures())
@@ -44,9 +45,10 @@ public final class HistoricalCameraPlugin: NSObject, FlutterPlugin, FlutterStrea
                 self?.emit(event)
             }
             self.controller = controller
+            lastResolutionPreset = args["resolutionPreset"] as? String ?? "auto"
             controller.initialize(
                 lens: args["lens"] as? String ?? "back",
-                resolutionPreset: args["resolutionPreset"] as? String ?? "hd720"
+                resolutionPreset: lastResolutionPreset
             ) { [weak self] outcome in
                 switch outcome {
                 case .success(let info):
@@ -85,6 +87,44 @@ public final class HistoricalCameraPlugin: NSObject, FlutterPlugin, FlutterStrea
                 }
             }
 
+        case "setZoom":
+            let args = call.arguments as? [String: Any] ?? [:]
+            let zoom = (args["zoom"] as? NSNumber)?.doubleValue ?? 1.0
+            if controller?.setZoom(zoom) == true {
+                mainResult(nil)
+            } else {
+                mainResult(badState())
+            }
+
+        case "switchLens":
+            // Rebuild the controller so switching reuses the proven
+            // initialize path; the texture id may change (docs/02 §3.1).
+            guard let controller else { return mainResult(badState()) }
+            let args = call.arguments as? [String: Any] ?? [:]
+            let lens = args["lens"] as? String ?? "back"
+            self.controller = nil
+            controller.dispose { [weak self] in
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    let next = CameraController(textures: self.textures) {
+                        [weak self] event in self?.emit(event)
+                    }
+                    self.controller = next
+                    next.initialize(
+                        lens: lens,
+                        resolutionPreset: self.lastResolutionPreset
+                    ) { [weak self] outcome in
+                        switch outcome {
+                        case .success(let info):
+                            mainResult(info)
+                        case .failure(let error):
+                            DispatchQueue.main.async { self?.controller = nil }
+                            mainResult(error.flutterError)
+                        }
+                    }
+                }
+            }
+
         case "setDebugStatsEnabled":
             let args = call.arguments as? [String: Any] ?? [:]
             let enabled = args["enabled"] as? Bool ?? false
@@ -109,7 +149,6 @@ public final class HistoricalCameraPlugin: NSObject, FlutterPlugin, FlutterStrea
             }
 
         default:
-            // setZoom / switchLens are P1 (docs/02 §3.1).
             result(FlutterMethodNotImplemented)
         }
     }

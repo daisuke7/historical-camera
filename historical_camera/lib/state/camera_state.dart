@@ -50,6 +50,12 @@ abstract class CameraState with _$CameraState {
     required int quarterTurns,
     required ThermalLevel thermal,
     required int recordingElapsedMs,
+
+    /// Active lens, 'back' or 'front' (P1 lens switch — docs/02 §3.1).
+    required String lens,
+
+    /// Current zoom ratio (P1 pinch zoom — docs/02 §3.1 setZoom).
+    required double zoom,
     int? textureId,
     int? previewWidth,
     int? previewHeight,
@@ -66,6 +72,8 @@ abstract class CameraState with _$CameraState {
         quarterTurns: 0,
         thermal: ThermalLevel.nominal,
         recordingElapsedMs: 0,
+        lens: 'back',
+        zoom: 1.0,
       );
 }
 
@@ -148,14 +156,17 @@ class CameraNotifier extends Notifier<CameraState> {
     _eventSub ??= _api.events.listen(_onEvent);
 
     try {
-      final info =
-          await _api.initialize(resolutionPreset: _resolutionPreset);
+      final info = await _api.initialize(
+        lens: state.lens,
+        resolutionPreset: _resolutionPreset,
+      );
       state = state.copyWith(
         phase: CameraPhase.previewing,
         textureId: info.textureId,
         previewWidth: info.previewWidth,
         previewHeight: info.previewHeight,
         quarterTurns: info.quarterTurns,
+        zoom: 1.0, // a fresh native session always starts unzoomed
       );
       // Make native reflect the current slider position (relevant after
       // a re-initialize; sends neutral on a fresh boot).
@@ -226,6 +237,50 @@ class CameraNotifier extends Notifier<CameraState> {
     if (state.phase != CameraPhase.paused) return;
     await _api.resumePreview();
     state = state.copyWith(phase: CameraPhase.previewing);
+  }
+
+  /// UX cap for pinch zoom; native additionally clamps to the device's real
+  /// maxZoom (docs/02 §3.1).
+  static const maxUiZoom = 8.0;
+
+  /// Pinch zoom (docs/02 §3.1 setZoom).
+  void setZoom(double zoom) {
+    if (state.phase != CameraPhase.previewing) return;
+    final clamped = zoom.clamp(1.0, maxUiZoom);
+    if (clamped == state.zoom) return;
+    state = state.copyWith(zoom: clamped);
+    unawaited(_api.setZoom(clamped));
+  }
+
+  /// Toggles between the back and front lens (docs/02 §3.1 switchLens).
+  /// The texture id may change, so the preview shows the boot spinner while
+  /// the native session is rebuilt.
+  Future<void> switchLens() async {
+    if (state.phase != CameraPhase.previewing) return;
+    final next = state.lens == 'back' ? 'front' : 'back';
+    state = state.copyWith(
+      phase: CameraPhase.initializing,
+      textureId: null,
+      zoom: 1.0,
+    );
+    try {
+      final info = await _api.switchLens(next);
+      state = state.copyWith(
+        phase: CameraPhase.previewing,
+        lens: next,
+        textureId: info.textureId,
+        previewWidth: info.previewWidth,
+        previewHeight: info.previewHeight,
+        quarterTurns: info.quarterTurns,
+      );
+      // The rebuilt native session starts at neutral params (docs/02 §2).
+      unawaited(_api.setFilterParams(paramsForYear(state.year, state.nowYear)));
+    } on PlatformException catch (e) {
+      state = state.copyWith(
+        phase: CameraPhase.error,
+        errorMessage: e.message ?? e.code,
+      );
+    }
   }
 
   /// Debug-panel resolution override (docs/04 §8.2): tears the native

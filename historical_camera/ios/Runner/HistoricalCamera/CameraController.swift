@@ -89,6 +89,22 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         return true
     }
 
+    /// Pinch zoom (docs/02 §3.1 setZoom, P1). Clamped to the device range;
+    /// videoZoomFactor applies to stills as well, so saved photos match the
+    /// preview framing.
+    func setZoom(_ zoom: Double) -> Bool {
+        guard isInitialized else { return false }
+        sessionQueue.async {
+            guard let device = self.videoDevice,
+                  (try? device.lockForConfiguration()) != nil
+            else { return }
+            let maxZoom = device.activeFormat.videoMaxZoomFactor
+            device.videoZoomFactor = min(max(CGFloat(zoom), 1.0), maxZoom)
+            device.unlockForConfiguration()
+        }
+        return true
+    }
+
     func pause(completion: @escaping () -> Void) {
         sessionQueue.async {
             self.session?.stopRunning()

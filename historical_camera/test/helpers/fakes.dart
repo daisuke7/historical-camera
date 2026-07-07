@@ -17,6 +17,9 @@ class FakeNativeCameraApi implements NativeCameraApi {
   Completer<CapturedPhoto>? pendingCapture;
   bool statsEnabled = false;
   String? lastResolutionPreset;
+  String? lastLens;
+  double? lastZoom;
+  PlatformException? switchLensError;
 
   @override
   Stream<CameraEvent> get events => eventsController.stream;
@@ -70,7 +73,10 @@ class FakeNativeCameraApi implements NativeCameraApi {
       const RecordingResult(path: '', durationMs: 0);
 
   @override
-  Future<void> setZoom(double zoom) async => calls.add('setZoom');
+  Future<void> setZoom(double zoom) async {
+    calls.add('setZoom');
+    lastZoom = zoom;
+  }
 
   @override
   Future<void> setDebugStatsEnabled(bool enabled) async {
@@ -79,7 +85,19 @@ class FakeNativeCameraApi implements NativeCameraApi {
   }
 
   @override
-  Future<PreviewInfo> switchLens(String lens) => throw UnimplementedError();
+  Future<PreviewInfo> switchLens(String lens) async {
+    calls.add('switchLens');
+    lastLens = lens;
+    final error = switchLensError;
+    if (error != null) throw error;
+    // The rebuilt session gets a new texture id (docs/02 §3.1).
+    return const PreviewInfo(
+      textureId: 8,
+      previewWidth: 1280,
+      previewHeight: 720,
+      quarterTurns: 1,
+    );
+  }
 
   @override
   Future<void> dispose() async => calls.add('dispose');

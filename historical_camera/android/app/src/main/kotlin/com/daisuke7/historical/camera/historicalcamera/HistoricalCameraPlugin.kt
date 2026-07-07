@@ -27,6 +27,7 @@ class HistoricalCameraPlugin :
     private var activity: Activity? = null
     private var controller: CameraController? = null
     private var eventSink: EventChannel.EventSink? = null
+    private var lastResolutionPreset = "auto"
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         textureRegistry = binding.textureRegistry
@@ -83,10 +84,11 @@ class HistoricalCameraPlugin :
                     emit(event)
                 }
                 this.controller = controller
+                lastResolutionPreset =
+                    call.argument<String>("resolutionPreset") ?: "auto"
                 controller.initialize(
                     lens = call.argument<String>("lens") ?: "back",
-                    resolutionPreset = call.argument<String>("resolutionPreset")
-                        ?: "hd720",
+                    resolutionPreset = lastResolutionPreset,
                 ) { outcome ->
                     mainHandler.post {
                         outcome.fold(
@@ -143,6 +145,59 @@ class HistoricalCameraPlugin :
                 }
             }
 
+            "setZoom" -> {
+                val zoom = call.argument<Number>("zoom")?.toDouble() ?: 1.0
+                if (controller?.setZoom(zoom) == true) {
+                    result.success(null)
+                } else {
+                    result.error(
+                        ErrorCodes.BAD_STATE, "camera is not initialized", null)
+                }
+            }
+
+            "switchLens" -> {
+                // Rebuild the controller so switching reuses the proven
+                // initialize path; the texture id may change (docs/02 §3.1).
+                val old = controller
+                if (old == null) {
+                    result.error(
+                        ErrorCodes.BAD_STATE, "camera is not initialized", null)
+                    return
+                }
+                val lens = call.argument<String>("lens") ?: "back"
+                controller = null
+                old.dispose {
+                    mainHandler.post {
+                        val activity = activity
+                        val textures = textureRegistry
+                        if (activity == null || textures == null) {
+                            result.error(
+                                ErrorCodes.CAMERA_UNAVAILABLE, "no activity", null)
+                            return@post
+                        }
+                        val next = CameraController(activity, textures) { event ->
+                            emit(event)
+                        }
+                        controller = next
+                        next.initialize(lens, lastResolutionPreset) { outcome ->
+                            mainHandler.post {
+                                outcome.fold(
+                                    onSuccess = { result.success(it) },
+                                    onFailure = { error ->
+                                        controller = null
+                                        val plugin = error as? PluginError
+                                        result.error(
+                                            plugin?.code
+                                                ?: ErrorCodes.CAMERA_UNAVAILABLE,
+                                            error.message, null)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             "setDebugStatsEnabled" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
                 if (controller?.setDebugStatsEnabled(enabled) == true) {
@@ -167,7 +222,6 @@ class HistoricalCameraPlugin :
                 }
             }
 
-            // setZoom / switchLens are P1 (docs/02 §3.1).
             else -> result.notImplemented()
         }
     }

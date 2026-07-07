@@ -17,7 +17,9 @@ mixin _$CameraState {
  CameraPhase get phase; int get nowYear;/// Continuous slider year; drives the filter during a drag.
  double get year;/// Year quantized to decades, capped at [nowYear] (docs/04 §2.2).
  int get quantizedYear; CaptureMode get mode;/// Clockwise 90-degree turns to display the preview upright.
- int get quarterTurns; ThermalLevel get thermal; int get recordingElapsedMs; int? get textureId; int? get previewWidth; int? get previewHeight; String? get lastSavedPath; String? get errorMessage;
+ int get quarterTurns; ThermalLevel get thermal; int get recordingElapsedMs;/// Active lens, 'back' or 'front' (P1 lens switch — docs/02 §3.1).
+ String get lens;/// Current zoom ratio (P1 pinch zoom — docs/02 §3.1 setZoom).
+ double get zoom; int? get textureId; int? get previewWidth; int? get previewHeight; String? get lastSavedPath; String? get errorMessage;
 /// Create a copy of CameraState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +30,16 @@ $CameraStateCopyWith<CameraState> get copyWith => _$CameraStateCopyWithImpl<Came
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CameraState&&(identical(other.phase, phase) || other.phase == phase)&&(identical(other.nowYear, nowYear) || other.nowYear == nowYear)&&(identical(other.year, year) || other.year == year)&&(identical(other.quantizedYear, quantizedYear) || other.quantizedYear == quantizedYear)&&(identical(other.mode, mode) || other.mode == mode)&&(identical(other.quarterTurns, quarterTurns) || other.quarterTurns == quarterTurns)&&(identical(other.thermal, thermal) || other.thermal == thermal)&&(identical(other.recordingElapsedMs, recordingElapsedMs) || other.recordingElapsedMs == recordingElapsedMs)&&(identical(other.textureId, textureId) || other.textureId == textureId)&&(identical(other.previewWidth, previewWidth) || other.previewWidth == previewWidth)&&(identical(other.previewHeight, previewHeight) || other.previewHeight == previewHeight)&&(identical(other.lastSavedPath, lastSavedPath) || other.lastSavedPath == lastSavedPath)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CameraState&&(identical(other.phase, phase) || other.phase == phase)&&(identical(other.nowYear, nowYear) || other.nowYear == nowYear)&&(identical(other.year, year) || other.year == year)&&(identical(other.quantizedYear, quantizedYear) || other.quantizedYear == quantizedYear)&&(identical(other.mode, mode) || other.mode == mode)&&(identical(other.quarterTurns, quarterTurns) || other.quarterTurns == quarterTurns)&&(identical(other.thermal, thermal) || other.thermal == thermal)&&(identical(other.recordingElapsedMs, recordingElapsedMs) || other.recordingElapsedMs == recordingElapsedMs)&&(identical(other.lens, lens) || other.lens == lens)&&(identical(other.zoom, zoom) || other.zoom == zoom)&&(identical(other.textureId, textureId) || other.textureId == textureId)&&(identical(other.previewWidth, previewWidth) || other.previewWidth == previewWidth)&&(identical(other.previewHeight, previewHeight) || other.previewHeight == previewHeight)&&(identical(other.lastSavedPath, lastSavedPath) || other.lastSavedPath == lastSavedPath)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,phase,nowYear,year,quantizedYear,mode,quarterTurns,thermal,recordingElapsedMs,textureId,previewWidth,previewHeight,lastSavedPath,errorMessage);
+int get hashCode => Object.hash(runtimeType,phase,nowYear,year,quantizedYear,mode,quarterTurns,thermal,recordingElapsedMs,lens,zoom,textureId,previewWidth,previewHeight,lastSavedPath,errorMessage);
 
 @override
 String toString() {
-  return 'CameraState(phase: $phase, nowYear: $nowYear, year: $year, quantizedYear: $quantizedYear, mode: $mode, quarterTurns: $quarterTurns, thermal: $thermal, recordingElapsedMs: $recordingElapsedMs, textureId: $textureId, previewWidth: $previewWidth, previewHeight: $previewHeight, lastSavedPath: $lastSavedPath, errorMessage: $errorMessage)';
+  return 'CameraState(phase: $phase, nowYear: $nowYear, year: $year, quantizedYear: $quantizedYear, mode: $mode, quarterTurns: $quarterTurns, thermal: $thermal, recordingElapsedMs: $recordingElapsedMs, lens: $lens, zoom: $zoom, textureId: $textureId, previewWidth: $previewWidth, previewHeight: $previewHeight, lastSavedPath: $lastSavedPath, errorMessage: $errorMessage)';
 }
 
 
@@ -48,7 +50,7 @@ abstract mixin class $CameraStateCopyWith<$Res>  {
   factory $CameraStateCopyWith(CameraState value, $Res Function(CameraState) _then) = _$CameraStateCopyWithImpl;
 @useResult
 $Res call({
- CameraPhase phase, int nowYear, double year, int quantizedYear, CaptureMode mode, int quarterTurns, ThermalLevel thermal, int recordingElapsedMs, int? textureId, int? previewWidth, int? previewHeight, String? lastSavedPath, String? errorMessage
+ CameraPhase phase, int nowYear, double year, int quantizedYear, CaptureMode mode, int quarterTurns, ThermalLevel thermal, int recordingElapsedMs, String lens, double zoom, int? textureId, int? previewWidth, int? previewHeight, String? lastSavedPath, String? errorMessage
 });
 
 
@@ -65,7 +67,7 @@ class _$CameraStateCopyWithImpl<$Res>
 
 /// Create a copy of CameraState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? phase = null,Object? nowYear = null,Object? year = null,Object? quantizedYear = null,Object? mode = null,Object? quarterTurns = null,Object? thermal = null,Object? recordingElapsedMs = null,Object? textureId = freezed,Object? previewWidth = freezed,Object? previewHeight = freezed,Object? lastSavedPath = freezed,Object? errorMessage = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? phase = null,Object? nowYear = null,Object? year = null,Object? quantizedYear = null,Object? mode = null,Object? quarterTurns = null,Object? thermal = null,Object? recordingElapsedMs = null,Object? lens = null,Object? zoom = null,Object? textureId = freezed,Object? previewWidth = freezed,Object? previewHeight = freezed,Object? lastSavedPath = freezed,Object? errorMessage = freezed,}) {
   return _then(_self.copyWith(
 phase: null == phase ? _self.phase : phase // ignore: cast_nullable_to_non_nullable
 as CameraPhase,nowYear: null == nowYear ? _self.nowYear : nowYear // ignore: cast_nullable_to_non_nullable
@@ -75,7 +77,9 @@ as int,mode: null == mode ? _self.mode : mode // ignore: cast_nullable_to_non_nu
 as CaptureMode,quarterTurns: null == quarterTurns ? _self.quarterTurns : quarterTurns // ignore: cast_nullable_to_non_nullable
 as int,thermal: null == thermal ? _self.thermal : thermal // ignore: cast_nullable_to_non_nullable
 as ThermalLevel,recordingElapsedMs: null == recordingElapsedMs ? _self.recordingElapsedMs : recordingElapsedMs // ignore: cast_nullable_to_non_nullable
-as int,textureId: freezed == textureId ? _self.textureId : textureId // ignore: cast_nullable_to_non_nullable
+as int,lens: null == lens ? _self.lens : lens // ignore: cast_nullable_to_non_nullable
+as String,zoom: null == zoom ? _self.zoom : zoom // ignore: cast_nullable_to_non_nullable
+as double,textureId: freezed == textureId ? _self.textureId : textureId // ignore: cast_nullable_to_non_nullable
 as int?,previewWidth: freezed == previewWidth ? _self.previewWidth : previewWidth // ignore: cast_nullable_to_non_nullable
 as int?,previewHeight: freezed == previewHeight ? _self.previewHeight : previewHeight // ignore: cast_nullable_to_non_nullable
 as int?,lastSavedPath: freezed == lastSavedPath ? _self.lastSavedPath : lastSavedPath // ignore: cast_nullable_to_non_nullable
@@ -165,10 +169,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( CameraPhase phase,  int nowYear,  double year,  int quantizedYear,  CaptureMode mode,  int quarterTurns,  ThermalLevel thermal,  int recordingElapsedMs,  int? textureId,  int? previewWidth,  int? previewHeight,  String? lastSavedPath,  String? errorMessage)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( CameraPhase phase,  int nowYear,  double year,  int quantizedYear,  CaptureMode mode,  int quarterTurns,  ThermalLevel thermal,  int recordingElapsedMs,  String lens,  double zoom,  int? textureId,  int? previewWidth,  int? previewHeight,  String? lastSavedPath,  String? errorMessage)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _CameraState() when $default != null:
-return $default(_that.phase,_that.nowYear,_that.year,_that.quantizedYear,_that.mode,_that.quarterTurns,_that.thermal,_that.recordingElapsedMs,_that.textureId,_that.previewWidth,_that.previewHeight,_that.lastSavedPath,_that.errorMessage);case _:
+return $default(_that.phase,_that.nowYear,_that.year,_that.quantizedYear,_that.mode,_that.quarterTurns,_that.thermal,_that.recordingElapsedMs,_that.lens,_that.zoom,_that.textureId,_that.previewWidth,_that.previewHeight,_that.lastSavedPath,_that.errorMessage);case _:
   return orElse();
 
 }
@@ -186,10 +190,10 @@ return $default(_that.phase,_that.nowYear,_that.year,_that.quantizedYear,_that.m
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( CameraPhase phase,  int nowYear,  double year,  int quantizedYear,  CaptureMode mode,  int quarterTurns,  ThermalLevel thermal,  int recordingElapsedMs,  int? textureId,  int? previewWidth,  int? previewHeight,  String? lastSavedPath,  String? errorMessage)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( CameraPhase phase,  int nowYear,  double year,  int quantizedYear,  CaptureMode mode,  int quarterTurns,  ThermalLevel thermal,  int recordingElapsedMs,  String lens,  double zoom,  int? textureId,  int? previewWidth,  int? previewHeight,  String? lastSavedPath,  String? errorMessage)  $default,) {final _that = this;
 switch (_that) {
 case _CameraState():
-return $default(_that.phase,_that.nowYear,_that.year,_that.quantizedYear,_that.mode,_that.quarterTurns,_that.thermal,_that.recordingElapsedMs,_that.textureId,_that.previewWidth,_that.previewHeight,_that.lastSavedPath,_that.errorMessage);case _:
+return $default(_that.phase,_that.nowYear,_that.year,_that.quantizedYear,_that.mode,_that.quarterTurns,_that.thermal,_that.recordingElapsedMs,_that.lens,_that.zoom,_that.textureId,_that.previewWidth,_that.previewHeight,_that.lastSavedPath,_that.errorMessage);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -206,10 +210,10 @@ return $default(_that.phase,_that.nowYear,_that.year,_that.quantizedYear,_that.m
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( CameraPhase phase,  int nowYear,  double year,  int quantizedYear,  CaptureMode mode,  int quarterTurns,  ThermalLevel thermal,  int recordingElapsedMs,  int? textureId,  int? previewWidth,  int? previewHeight,  String? lastSavedPath,  String? errorMessage)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( CameraPhase phase,  int nowYear,  double year,  int quantizedYear,  CaptureMode mode,  int quarterTurns,  ThermalLevel thermal,  int recordingElapsedMs,  String lens,  double zoom,  int? textureId,  int? previewWidth,  int? previewHeight,  String? lastSavedPath,  String? errorMessage)?  $default,) {final _that = this;
 switch (_that) {
 case _CameraState() when $default != null:
-return $default(_that.phase,_that.nowYear,_that.year,_that.quantizedYear,_that.mode,_that.quarterTurns,_that.thermal,_that.recordingElapsedMs,_that.textureId,_that.previewWidth,_that.previewHeight,_that.lastSavedPath,_that.errorMessage);case _:
+return $default(_that.phase,_that.nowYear,_that.year,_that.quantizedYear,_that.mode,_that.quarterTurns,_that.thermal,_that.recordingElapsedMs,_that.lens,_that.zoom,_that.textureId,_that.previewWidth,_that.previewHeight,_that.lastSavedPath,_that.errorMessage);case _:
   return null;
 
 }
@@ -221,7 +225,7 @@ return $default(_that.phase,_that.nowYear,_that.year,_that.quantizedYear,_that.m
 
 
 class _CameraState extends CameraState {
-  const _CameraState({required this.phase, required this.nowYear, required this.year, required this.quantizedYear, required this.mode, required this.quarterTurns, required this.thermal, required this.recordingElapsedMs, this.textureId, this.previewWidth, this.previewHeight, this.lastSavedPath, this.errorMessage}): super._();
+  const _CameraState({required this.phase, required this.nowYear, required this.year, required this.quantizedYear, required this.mode, required this.quarterTurns, required this.thermal, required this.recordingElapsedMs, required this.lens, required this.zoom, this.textureId, this.previewWidth, this.previewHeight, this.lastSavedPath, this.errorMessage}): super._();
   
 
 @override final  CameraPhase phase;
@@ -235,6 +239,10 @@ class _CameraState extends CameraState {
 @override final  int quarterTurns;
 @override final  ThermalLevel thermal;
 @override final  int recordingElapsedMs;
+/// Active lens, 'back' or 'front' (P1 lens switch — docs/02 §3.1).
+@override final  String lens;
+/// Current zoom ratio (P1 pinch zoom — docs/02 §3.1 setZoom).
+@override final  double zoom;
 @override final  int? textureId;
 @override final  int? previewWidth;
 @override final  int? previewHeight;
@@ -251,16 +259,16 @@ _$CameraStateCopyWith<_CameraState> get copyWith => __$CameraStateCopyWithImpl<_
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CameraState&&(identical(other.phase, phase) || other.phase == phase)&&(identical(other.nowYear, nowYear) || other.nowYear == nowYear)&&(identical(other.year, year) || other.year == year)&&(identical(other.quantizedYear, quantizedYear) || other.quantizedYear == quantizedYear)&&(identical(other.mode, mode) || other.mode == mode)&&(identical(other.quarterTurns, quarterTurns) || other.quarterTurns == quarterTurns)&&(identical(other.thermal, thermal) || other.thermal == thermal)&&(identical(other.recordingElapsedMs, recordingElapsedMs) || other.recordingElapsedMs == recordingElapsedMs)&&(identical(other.textureId, textureId) || other.textureId == textureId)&&(identical(other.previewWidth, previewWidth) || other.previewWidth == previewWidth)&&(identical(other.previewHeight, previewHeight) || other.previewHeight == previewHeight)&&(identical(other.lastSavedPath, lastSavedPath) || other.lastSavedPath == lastSavedPath)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CameraState&&(identical(other.phase, phase) || other.phase == phase)&&(identical(other.nowYear, nowYear) || other.nowYear == nowYear)&&(identical(other.year, year) || other.year == year)&&(identical(other.quantizedYear, quantizedYear) || other.quantizedYear == quantizedYear)&&(identical(other.mode, mode) || other.mode == mode)&&(identical(other.quarterTurns, quarterTurns) || other.quarterTurns == quarterTurns)&&(identical(other.thermal, thermal) || other.thermal == thermal)&&(identical(other.recordingElapsedMs, recordingElapsedMs) || other.recordingElapsedMs == recordingElapsedMs)&&(identical(other.lens, lens) || other.lens == lens)&&(identical(other.zoom, zoom) || other.zoom == zoom)&&(identical(other.textureId, textureId) || other.textureId == textureId)&&(identical(other.previewWidth, previewWidth) || other.previewWidth == previewWidth)&&(identical(other.previewHeight, previewHeight) || other.previewHeight == previewHeight)&&(identical(other.lastSavedPath, lastSavedPath) || other.lastSavedPath == lastSavedPath)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,phase,nowYear,year,quantizedYear,mode,quarterTurns,thermal,recordingElapsedMs,textureId,previewWidth,previewHeight,lastSavedPath,errorMessage);
+int get hashCode => Object.hash(runtimeType,phase,nowYear,year,quantizedYear,mode,quarterTurns,thermal,recordingElapsedMs,lens,zoom,textureId,previewWidth,previewHeight,lastSavedPath,errorMessage);
 
 @override
 String toString() {
-  return 'CameraState(phase: $phase, nowYear: $nowYear, year: $year, quantizedYear: $quantizedYear, mode: $mode, quarterTurns: $quarterTurns, thermal: $thermal, recordingElapsedMs: $recordingElapsedMs, textureId: $textureId, previewWidth: $previewWidth, previewHeight: $previewHeight, lastSavedPath: $lastSavedPath, errorMessage: $errorMessage)';
+  return 'CameraState(phase: $phase, nowYear: $nowYear, year: $year, quantizedYear: $quantizedYear, mode: $mode, quarterTurns: $quarterTurns, thermal: $thermal, recordingElapsedMs: $recordingElapsedMs, lens: $lens, zoom: $zoom, textureId: $textureId, previewWidth: $previewWidth, previewHeight: $previewHeight, lastSavedPath: $lastSavedPath, errorMessage: $errorMessage)';
 }
 
 
@@ -271,7 +279,7 @@ abstract mixin class _$CameraStateCopyWith<$Res> implements $CameraStateCopyWith
   factory _$CameraStateCopyWith(_CameraState value, $Res Function(_CameraState) _then) = __$CameraStateCopyWithImpl;
 @override @useResult
 $Res call({
- CameraPhase phase, int nowYear, double year, int quantizedYear, CaptureMode mode, int quarterTurns, ThermalLevel thermal, int recordingElapsedMs, int? textureId, int? previewWidth, int? previewHeight, String? lastSavedPath, String? errorMessage
+ CameraPhase phase, int nowYear, double year, int quantizedYear, CaptureMode mode, int quarterTurns, ThermalLevel thermal, int recordingElapsedMs, String lens, double zoom, int? textureId, int? previewWidth, int? previewHeight, String? lastSavedPath, String? errorMessage
 });
 
 
@@ -288,7 +296,7 @@ class __$CameraStateCopyWithImpl<$Res>
 
 /// Create a copy of CameraState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? phase = null,Object? nowYear = null,Object? year = null,Object? quantizedYear = null,Object? mode = null,Object? quarterTurns = null,Object? thermal = null,Object? recordingElapsedMs = null,Object? textureId = freezed,Object? previewWidth = freezed,Object? previewHeight = freezed,Object? lastSavedPath = freezed,Object? errorMessage = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? phase = null,Object? nowYear = null,Object? year = null,Object? quantizedYear = null,Object? mode = null,Object? quarterTurns = null,Object? thermal = null,Object? recordingElapsedMs = null,Object? lens = null,Object? zoom = null,Object? textureId = freezed,Object? previewWidth = freezed,Object? previewHeight = freezed,Object? lastSavedPath = freezed,Object? errorMessage = freezed,}) {
   return _then(_CameraState(
 phase: null == phase ? _self.phase : phase // ignore: cast_nullable_to_non_nullable
 as CameraPhase,nowYear: null == nowYear ? _self.nowYear : nowYear // ignore: cast_nullable_to_non_nullable
@@ -298,7 +306,9 @@ as int,mode: null == mode ? _self.mode : mode // ignore: cast_nullable_to_non_nu
 as CaptureMode,quarterTurns: null == quarterTurns ? _self.quarterTurns : quarterTurns // ignore: cast_nullable_to_non_nullable
 as int,thermal: null == thermal ? _self.thermal : thermal // ignore: cast_nullable_to_non_nullable
 as ThermalLevel,recordingElapsedMs: null == recordingElapsedMs ? _self.recordingElapsedMs : recordingElapsedMs // ignore: cast_nullable_to_non_nullable
-as int,textureId: freezed == textureId ? _self.textureId : textureId // ignore: cast_nullable_to_non_nullable
+as int,lens: null == lens ? _self.lens : lens // ignore: cast_nullable_to_non_nullable
+as String,zoom: null == zoom ? _self.zoom : zoom // ignore: cast_nullable_to_non_nullable
+as double,textureId: freezed == textureId ? _self.textureId : textureId // ignore: cast_nullable_to_non_nullable
 as int?,previewWidth: freezed == previewWidth ? _self.previewWidth : previewWidth // ignore: cast_nullable_to_non_nullable
 as int?,previewHeight: freezed == previewHeight ? _self.previewHeight : previewHeight // ignore: cast_nullable_to_non_nullable
 as int?,lastSavedPath: freezed == lastSavedPath ? _self.lastSavedPath : lastSavedPath // ignore: cast_nullable_to_non_nullable
