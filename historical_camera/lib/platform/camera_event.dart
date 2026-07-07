@@ -29,6 +29,10 @@ sealed class CameraEvent with _$CameraEvent {
   const factory CameraEvent.recordingProgress(int elapsedMs) =
       RecordingProgressEvent;
 
+  /// Filter GPU time of the most recent frame, once per second while
+  /// `setDebugStatsEnabled(true)` (P1, docs/02 §3.2).
+  const factory CameraEvent.debugStats(double gpuMs) = DebugStatsEvent;
+
   /// Runtime error (session interruption, disk full, ...).
   const factory CameraEvent.error(String code, String message) =
       CameraErrorEvent;
@@ -54,6 +58,8 @@ sealed class CameraEvent with _$CameraEvent {
         return CameraEvent.recordingProgress(
           (map['elapsedMs']! as num).toInt(),
         );
+      case 'debugStats':
+        return CameraEvent.debugStats((map['gpuMs']! as num).toDouble());
       case 'error':
         return CameraEvent.error(
           map['code'] as String? ?? 'UNKNOWN',

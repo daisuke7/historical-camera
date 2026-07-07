@@ -55,7 +55,7 @@ extension CameraEventPatterns on CameraEvent {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( CameraInitializedEvent value)?  initialized,TResult Function( OrientationChangedEvent value)?  orientationChanged,TResult Function( PhotoSavedEvent value)?  photoSaved,TResult Function( ThermalEvent value)?  thermal,TResult Function( RecordingProgressEvent value)?  recordingProgress,TResult Function( CameraErrorEvent value)?  error,required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( CameraInitializedEvent value)?  initialized,TResult Function( OrientationChangedEvent value)?  orientationChanged,TResult Function( PhotoSavedEvent value)?  photoSaved,TResult Function( ThermalEvent value)?  thermal,TResult Function( RecordingProgressEvent value)?  recordingProgress,TResult Function( DebugStatsEvent value)?  debugStats,TResult Function( CameraErrorEvent value)?  error,required TResult orElse(),}){
 final _that = this;
 switch (_that) {
 case CameraInitializedEvent() when initialized != null:
@@ -63,7 +63,8 @@ return initialized(_that);case OrientationChangedEvent() when orientationChanged
 return orientationChanged(_that);case PhotoSavedEvent() when photoSaved != null:
 return photoSaved(_that);case ThermalEvent() when thermal != null:
 return thermal(_that);case RecordingProgressEvent() when recordingProgress != null:
-return recordingProgress(_that);case CameraErrorEvent() when error != null:
+return recordingProgress(_that);case DebugStatsEvent() when debugStats != null:
+return debugStats(_that);case CameraErrorEvent() when error != null:
 return error(_that);case _:
   return orElse();
 
@@ -82,7 +83,7 @@ return error(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( CameraInitializedEvent value)  initialized,required TResult Function( OrientationChangedEvent value)  orientationChanged,required TResult Function( PhotoSavedEvent value)  photoSaved,required TResult Function( ThermalEvent value)  thermal,required TResult Function( RecordingProgressEvent value)  recordingProgress,required TResult Function( CameraErrorEvent value)  error,}){
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( CameraInitializedEvent value)  initialized,required TResult Function( OrientationChangedEvent value)  orientationChanged,required TResult Function( PhotoSavedEvent value)  photoSaved,required TResult Function( ThermalEvent value)  thermal,required TResult Function( RecordingProgressEvent value)  recordingProgress,required TResult Function( DebugStatsEvent value)  debugStats,required TResult Function( CameraErrorEvent value)  error,}){
 final _that = this;
 switch (_that) {
 case CameraInitializedEvent():
@@ -90,7 +91,8 @@ return initialized(_that);case OrientationChangedEvent():
 return orientationChanged(_that);case PhotoSavedEvent():
 return photoSaved(_that);case ThermalEvent():
 return thermal(_that);case RecordingProgressEvent():
-return recordingProgress(_that);case CameraErrorEvent():
+return recordingProgress(_that);case DebugStatsEvent():
+return debugStats(_that);case CameraErrorEvent():
 return error(_that);}
 }
 /// A variant of `map` that fallback to returning `null`.
@@ -105,7 +107,7 @@ return error(_that);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( CameraInitializedEvent value)?  initialized,TResult? Function( OrientationChangedEvent value)?  orientationChanged,TResult? Function( PhotoSavedEvent value)?  photoSaved,TResult? Function( ThermalEvent value)?  thermal,TResult? Function( RecordingProgressEvent value)?  recordingProgress,TResult? Function( CameraErrorEvent value)?  error,}){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( CameraInitializedEvent value)?  initialized,TResult? Function( OrientationChangedEvent value)?  orientationChanged,TResult? Function( PhotoSavedEvent value)?  photoSaved,TResult? Function( ThermalEvent value)?  thermal,TResult? Function( RecordingProgressEvent value)?  recordingProgress,TResult? Function( DebugStatsEvent value)?  debugStats,TResult? Function( CameraErrorEvent value)?  error,}){
 final _that = this;
 switch (_that) {
 case CameraInitializedEvent() when initialized != null:
@@ -113,7 +115,8 @@ return initialized(_that);case OrientationChangedEvent() when orientationChanged
 return orientationChanged(_that);case PhotoSavedEvent() when photoSaved != null:
 return photoSaved(_that);case ThermalEvent() when thermal != null:
 return thermal(_that);case RecordingProgressEvent() when recordingProgress != null:
-return recordingProgress(_that);case CameraErrorEvent() when error != null:
+return recordingProgress(_that);case DebugStatsEvent() when debugStats != null:
+return debugStats(_that);case CameraErrorEvent() when error != null:
 return error(_that);case _:
   return null;
 
@@ -131,14 +134,15 @@ return error(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  initialized,TResult Function( int quarterTurns)?  orientationChanged,TResult Function( String path)?  photoSaved,TResult Function( ThermalLevel level)?  thermal,TResult Function( int elapsedMs)?  recordingProgress,TResult Function( String code,  String message)?  error,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  initialized,TResult Function( int quarterTurns)?  orientationChanged,TResult Function( String path)?  photoSaved,TResult Function( ThermalLevel level)?  thermal,TResult Function( int elapsedMs)?  recordingProgress,TResult Function( double gpuMs)?  debugStats,TResult Function( String code,  String message)?  error,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case CameraInitializedEvent() when initialized != null:
 return initialized();case OrientationChangedEvent() when orientationChanged != null:
 return orientationChanged(_that.quarterTurns);case PhotoSavedEvent() when photoSaved != null:
 return photoSaved(_that.path);case ThermalEvent() when thermal != null:
 return thermal(_that.level);case RecordingProgressEvent() when recordingProgress != null:
-return recordingProgress(_that.elapsedMs);case CameraErrorEvent() when error != null:
+return recordingProgress(_that.elapsedMs);case DebugStatsEvent() when debugStats != null:
+return debugStats(_that.gpuMs);case CameraErrorEvent() when error != null:
 return error(_that.code,_that.message);case _:
   return orElse();
 
@@ -157,14 +161,15 @@ return error(_that.code,_that.message);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  initialized,required TResult Function( int quarterTurns)  orientationChanged,required TResult Function( String path)  photoSaved,required TResult Function( ThermalLevel level)  thermal,required TResult Function( int elapsedMs)  recordingProgress,required TResult Function( String code,  String message)  error,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  initialized,required TResult Function( int quarterTurns)  orientationChanged,required TResult Function( String path)  photoSaved,required TResult Function( ThermalLevel level)  thermal,required TResult Function( int elapsedMs)  recordingProgress,required TResult Function( double gpuMs)  debugStats,required TResult Function( String code,  String message)  error,}) {final _that = this;
 switch (_that) {
 case CameraInitializedEvent():
 return initialized();case OrientationChangedEvent():
 return orientationChanged(_that.quarterTurns);case PhotoSavedEvent():
 return photoSaved(_that.path);case ThermalEvent():
 return thermal(_that.level);case RecordingProgressEvent():
-return recordingProgress(_that.elapsedMs);case CameraErrorEvent():
+return recordingProgress(_that.elapsedMs);case DebugStatsEvent():
+return debugStats(_that.gpuMs);case CameraErrorEvent():
 return error(_that.code,_that.message);}
 }
 /// A variant of `when` that fallback to returning `null`
@@ -179,14 +184,15 @@ return error(_that.code,_that.message);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  initialized,TResult? Function( int quarterTurns)?  orientationChanged,TResult? Function( String path)?  photoSaved,TResult? Function( ThermalLevel level)?  thermal,TResult? Function( int elapsedMs)?  recordingProgress,TResult? Function( String code,  String message)?  error,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  initialized,TResult? Function( int quarterTurns)?  orientationChanged,TResult? Function( String path)?  photoSaved,TResult? Function( ThermalLevel level)?  thermal,TResult? Function( int elapsedMs)?  recordingProgress,TResult? Function( double gpuMs)?  debugStats,TResult? Function( String code,  String message)?  error,}) {final _that = this;
 switch (_that) {
 case CameraInitializedEvent() when initialized != null:
 return initialized();case OrientationChangedEvent() when orientationChanged != null:
 return orientationChanged(_that.quarterTurns);case PhotoSavedEvent() when photoSaved != null:
 return photoSaved(_that.path);case ThermalEvent() when thermal != null:
 return thermal(_that.level);case RecordingProgressEvent() when recordingProgress != null:
-return recordingProgress(_that.elapsedMs);case CameraErrorEvent() when error != null:
+return recordingProgress(_that.elapsedMs);case DebugStatsEvent() when debugStats != null:
+return debugStats(_that.gpuMs);case CameraErrorEvent() when error != null:
 return error(_that.code,_that.message);case _:
   return null;
 
@@ -485,6 +491,72 @@ class _$RecordingProgressEventCopyWithImpl<$Res>
   return _then(RecordingProgressEvent(
 null == elapsedMs ? _self.elapsedMs : elapsedMs // ignore: cast_nullable_to_non_nullable
 as int,
+  ));
+}
+
+
+}
+
+/// @nodoc
+
+
+class DebugStatsEvent implements CameraEvent {
+  const DebugStatsEvent(this.gpuMs);
+  
+
+ final  double gpuMs;
+
+/// Create a copy of CameraEvent
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$DebugStatsEventCopyWith<DebugStatsEvent> get copyWith => _$DebugStatsEventCopyWithImpl<DebugStatsEvent>(this, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is DebugStatsEvent&&(identical(other.gpuMs, gpuMs) || other.gpuMs == gpuMs));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,gpuMs);
+
+@override
+String toString() {
+  return 'CameraEvent.debugStats(gpuMs: $gpuMs)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $DebugStatsEventCopyWith<$Res> implements $CameraEventCopyWith<$Res> {
+  factory $DebugStatsEventCopyWith(DebugStatsEvent value, $Res Function(DebugStatsEvent) _then) = _$DebugStatsEventCopyWithImpl;
+@useResult
+$Res call({
+ double gpuMs
+});
+
+
+
+
+}
+/// @nodoc
+class _$DebugStatsEventCopyWithImpl<$Res>
+    implements $DebugStatsEventCopyWith<$Res> {
+  _$DebugStatsEventCopyWithImpl(this._self, this._then);
+
+  final DebugStatsEvent _self;
+  final $Res Function(DebugStatsEvent) _then;
+
+/// Create a copy of CameraEvent
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') $Res call({Object? gpuMs = null,}) {
+  return _then(DebugStatsEvent(
+null == gpuMs ? _self.gpuMs : gpuMs // ignore: cast_nullable_to_non_nullable
+as double,
   ));
 }
 

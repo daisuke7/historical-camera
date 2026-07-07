@@ -111,6 +111,10 @@ class CameraController(
         surfaceProducer = producer
         val renderer = FilterRenderer(producer)
         this.renderer = renderer
+        // Debug-panel GPU readout (docs/02 §3.2); emitEvent hops to main.
+        renderer.onDebugStats = { gpuMs ->
+            emitEvent(mapOf("type" to "debugStats", "gpuMs" to gpuMs))
+        }
         val mirror = lens == "front"
         isFrontLens = mirror
 
@@ -245,6 +249,14 @@ class CameraController(
         val renderer = renderer ?: return false
         if (!isInitialized) return false
         renderer.params = FilterParams.fromMap(map)
+        return true
+    }
+
+    /** Debug-panel GPU stats toggle (docs/02 §3.1). */
+    fun setDebugStatsEnabled(enabled: Boolean): Boolean {
+        val renderer = renderer ?: return false
+        if (!isInitialized) return false
+        renderer.debugStatsEnabled = enabled
         return true
     }
 

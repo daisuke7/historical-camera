@@ -316,6 +316,18 @@ void main() {
     @Volatile
     var orientationTurns: Int = 0
 
+    /**
+     * Debug-panel GPU stats (docs/02 §3.1 setDebugStatsEnabled). Off by
+     * default so normal runs carry no measurement overhead; must work in
+     * release builds too (the panel ships in them — docs/08 §8.3).
+     */
+    @Volatile
+    var debugStatsEnabled: Boolean = false
+
+    /** Called at most once per second with the latest frame GPU time (ms). */
+    @Volatile
+    var onDebugStats: ((Double) -> Unit)? = null
+
     @Volatile
     private var mirror = false
 
@@ -364,14 +376,17 @@ void main() {
     private var stillPositionBuffer: FloatBuffer? = null
     private var stillTexCoordBuffer: FloatBuffer? = null
 
-    // GPU frame-time measurement (docs/08 T9): EXT_disjoint_timer_query,
-    // debug builds only, ping-pong queries to avoid stalling.
+    // GPU frame-time measurement: EXT_disjoint_timer_query with ping-pong
+    // queries to avoid stalling. Used by the debug-build average log
+    // (docs/08 T9) and the debugStats event (docs/02 §3.2); devices without
+    // the extension fall back to glFinish CPU timing for debugStats only.
     private var timerSupported = false
     private val timerQueries = IntArray(2)
     private val timerPending = BooleanArray(2)
     private var timerIndex = 0
     private var gpuTimeSumNs = 0L
     private var gpuFrameCount = 0
+    private var lastStatsEmitNs = 0L
 
     private lateinit var positionBuffer: FloatBuffer
     private lateinit var texCoordBuffer: FloatBuffer
@@ -722,6 +737,10 @@ void main() {
         surfaceTexture.getTransformMatrix(texMatrix)
 
         val timing = beginGpuTimer()
+        // glFinish fallback (docs/06 §9): CPU timing, conservative — only
+        // while the debug panel has stats enabled, never in normal runs.
+        val cpuStartNs =
+            if (debugStatsEnabled && !timerSupported) System.nanoTime() else 0L
 
         GLES30.glViewport(0, 0, width, height)
         GLES30.glUseProgram(program)
@@ -758,6 +777,10 @@ void main() {
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
 
         endGpuTimer(timing)
+        if (cpuStartNs != 0L) {
+            GLES30.glFinish()
+            recordGpuTime(System.nanoTime() - cpuStartNs)
+        }
         EGL14.eglSwapBuffers(display, windowSurface)
     }
 
@@ -772,20 +795,24 @@ void main() {
     // MARK: GPU timing (docs/08 T9 acceptance: <8 ms on the test device)
 
     private fun setupTimerQueries() {
-        if (!BuildConfig.DEBUG) return
         val extensions = GLES30.glGetString(GLES30.GL_EXTENSIONS) ?: ""
         timerSupported = extensions.contains("GL_EXT_disjoint_timer_query")
         if (timerSupported) {
             GLES30.glGenQueries(2, timerQueries, 0)
             Log.d(TAG, "GPU timer queries enabled")
         } else {
-            Log.d(TAG, "GL_EXT_disjoint_timer_query unsupported; no GPU timing")
+            Log.d(TAG, "GL_EXT_disjoint_timer_query unsupported; " +
+                "debugStats falls back to glFinish CPU timing")
         }
     }
 
+    /** Timing runs for the debug-build log or while debugStats is enabled. */
+    private fun timingActive(): Boolean =
+        BuildConfig.DEBUG || debugStatsEnabled
+
     /** Returns the query slot begun for this frame, or -1. */
     private fun beginGpuTimer(): Int {
-        if (!timerSupported) return -1
+        if (!timerSupported || !timingActive()) return -1
         val index = timerIndex
         if (timerPending[index]) {
             val available = IntArray(1)
@@ -811,14 +838,24 @@ void main() {
     }
 
     private fun recordGpuTime(nanos: Long) {
-        gpuTimeSumNs += nanos
-        gpuFrameCount++
-        if (gpuFrameCount >= 120) {
-            val avgMs = gpuTimeSumNs / gpuFrameCount / 1_000_000.0
-            Log.d(TAG, "eraFilter GPU avg: %.2f ms (last %d frames)"
-                .format(avgMs, gpuFrameCount))
-            gpuTimeSumNs = 0
-            gpuFrameCount = 0
+        if (BuildConfig.DEBUG) {
+            gpuTimeSumNs += nanos
+            gpuFrameCount++
+            if (gpuFrameCount >= 120) {
+                val avgMs = gpuTimeSumNs / gpuFrameCount / 1_000_000.0
+                Log.d(TAG, "eraFilter GPU avg: %.2f ms (last %d frames)"
+                    .format(avgMs, gpuFrameCount))
+                gpuTimeSumNs = 0
+                gpuFrameCount = 0
+            }
+        }
+        if (debugStatsEnabled) {
+            // 1 Hz debugStats event with the latest reading (docs/02 §3.2).
+            val now = System.nanoTime()
+            if (now - lastStatsEmitNs >= 1_000_000_000L) {
+                lastStatsEmitNs = now
+                onDebugStats?.invoke(nanos / 1_000_000.0)
+            }
         }
     }
 

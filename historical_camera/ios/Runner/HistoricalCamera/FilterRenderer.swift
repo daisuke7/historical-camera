@@ -53,6 +53,20 @@ final class FilterRenderer: NSObject, FlutterTexture {
     /// Called after each rendered frame; wired to textureFrameAvailable.
     var onFrameAvailable: (() -> Void)?
 
+    /// Debug-panel GPU stats (docs/02 §3.1/§3.2). Off by default so normal
+    /// runs carry no overhead; must work in release builds too because the
+    /// panel ships in them (docs/08 §8.3).
+    private var debugStatsEnabledFlag = false
+    private var lastStatsEmit: CFTimeInterval = 0
+
+    var debugStatsEnabled: Bool {
+        get { lock.lock(); defer { lock.unlock() }; return debugStatsEnabledFlag }
+        set { lock.lock(); debugStatsEnabledFlag = newValue; lock.unlock() }
+    }
+
+    /// Called at most once per second with the latest frame GPU time (ms).
+    var onDebugStats: ((Double) -> Void)?
+
     init?(width: Int, height: Int) {
         guard
             let device = MTLCreateSystemDefaultDevice(),
@@ -272,9 +286,12 @@ final class FilterRenderer: NSObject, FlutterTexture {
             self.latestBuffer = output
             self.isRendering = false
             self.lock.unlock()
+            // Same measurement API as the 1080p gate (docs/01 §1.1).
+            let gpuSeconds = finished.gpuEndTime - finished.gpuStartTime
             #if DEBUG
-            self.recordGpuTime(finished.gpuEndTime - finished.gpuStartTime)
+            self.recordGpuTime(gpuSeconds)
             #endif
+            self.reportDebugStats(gpuSeconds)
             self.onFrameAvailable?()
         }
         command.commit()
@@ -306,6 +323,16 @@ final class FilterRenderer: NSObject, FlutterTexture {
         lock.lock()
         isRendering = false
         lock.unlock()
+    }
+
+    /// 1 Hz debugStats emission with the latest reading (docs/02 §3.2).
+    private func reportDebugStats(_ gpuSeconds: Double) {
+        lock.lock()
+        let now = CACurrentMediaTime()
+        let emit = debugStatsEnabledFlag && now - lastStatsEmit >= 1.0
+        if emit { lastStatsEmit = now }
+        lock.unlock()
+        if emit { onDebugStats?(gpuSeconds * 1000) }
     }
 
     #if DEBUG

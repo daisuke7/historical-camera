@@ -137,6 +137,12 @@ class NativeCameraApi {
   Future<void> setZoom(double zoom) =>
       _method.invokeMethod<void>('setZoom', {'zoom': zoom});
 
+  /// Enables the 1 Hz `debugStats` event while the debug panel is visible
+  /// (docs/02 §3.1). Off by default so normal runs carry no measurement
+  /// overhead.
+  Future<void> setDebugStatsEnabled(bool enabled) => _method
+      .invokeMethod<void>('setDebugStatsEnabled', {'enabled': enabled});
+
   Future<PreviewInfo> switchLens(String lens) async {
     final map = await _method
         .invokeMapMethod<String, Object?>('switchLens', {'lens': lens});

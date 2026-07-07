@@ -81,6 +81,13 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         return true
     }
 
+    /// Debug-panel GPU stats toggle (docs/02 §3.1).
+    func setDebugStatsEnabled(_ enabled: Bool) -> Bool {
+        guard isInitialized, let renderer else { return false }
+        renderer.debugStatsEnabled = enabled
+        return true
+    }
+
     func pause(completion: @escaping () -> Void) {
         sessionQueue.async {
             self.session?.stopRunning()
@@ -198,6 +205,10 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         let textureId = textures.register(renderer)
         renderer.onFrameAvailable = { [weak self] in
             self?.textures.textureFrameAvailable(textureId)
+        }
+        // Debug-panel GPU readout (docs/02 §3.2); emitEvent hops to main.
+        renderer.onDebugStats = { [weak self] gpuMs in
+            self?.emitEvent(["type": "debugStats", "gpuMs": gpuMs])
         }
 
         self.session = session

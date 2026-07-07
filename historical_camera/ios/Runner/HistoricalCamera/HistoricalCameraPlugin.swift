@@ -85,6 +85,15 @@ public final class HistoricalCameraPlugin: NSObject, FlutterPlugin, FlutterStrea
                 }
             }
 
+        case "setDebugStatsEnabled":
+            let args = call.arguments as? [String: Any] ?? [:]
+            let enabled = args["enabled"] as? Bool ?? false
+            if controller?.setDebugStatsEnabled(enabled) == true {
+                mainResult(nil)
+            } else {
+                mainResult(badState())
+            }
+
         case "startRecording", "stopRecording":
             mainResult(FlutterError(
                 code: ErrorCodes.recordingFailed,

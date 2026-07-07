@@ -15,6 +15,8 @@ class FakeNativeCameraApi implements NativeCameraApi {
   final eventsController = StreamController<CameraEvent>.broadcast();
   String? initializeErrorCode;
   Completer<CapturedPhoto>? pendingCapture;
+  bool statsEnabled = false;
+  String? lastResolutionPreset;
 
   @override
   Stream<CameraEvent> get events => eventsController.stream;
@@ -25,6 +27,7 @@ class FakeNativeCameraApi implements NativeCameraApi {
     String resolutionPreset = 'hd720',
   }) async {
     calls.add('initialize');
+    lastResolutionPreset = resolutionPreset;
     final code = initializeErrorCode;
     if (code != null) {
       throw PlatformException(code: code, message: 'boom');
@@ -68,6 +71,12 @@ class FakeNativeCameraApi implements NativeCameraApi {
 
   @override
   Future<void> setZoom(double zoom) async => calls.add('setZoom');
+
+  @override
+  Future<void> setDebugStatsEnabled(bool enabled) async {
+    calls.add('setDebugStatsEnabled:$enabled');
+    statsEnabled = enabled;
+  }
 
   @override
   Future<PreviewInfo> switchLens(String lens) => throw UnimplementedError();

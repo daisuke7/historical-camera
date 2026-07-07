@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../state/camera_state.dart';
 import '../strings.dart';
+import 'debug_panel.dart';
 import 'era_label.dart';
 import 'era_slider.dart';
 import 'shutter_button.dart';
@@ -102,6 +103,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             children: [
               const _PreviewLayer(),
               const _CameraOverlay(),
+              // Hidden tuning panel / manual badge (docs/04 §8).
+              const DebugPanelHost(),
               _FlashOverlay(animation: _flash),
             ],
           ),
@@ -181,7 +184,8 @@ class _CameraOverlay extends StatelessWidget {
             alignment: Alignment.topCenter,
             child: Padding(
               padding: EdgeInsets.only(top: 16),
-              child: EraLabel(),
+              // 3-second long-press opens the debug panel (docs/04 §8.1).
+              child: DebugPanelTrigger(child: EraLabel()),
             ),
           ),
           const Align(

@@ -143,6 +143,16 @@ class HistoricalCameraPlugin :
                 }
             }
 
+            "setDebugStatsEnabled" -> {
+                val enabled = call.argument<Boolean>("enabled") ?: false
+                if (controller?.setDebugStatsEnabled(enabled) == true) {
+                    result.success(null)
+                } else {
+                    result.error(
+                        ErrorCodes.BAD_STATE, "camera is not initialized", null)
+                }
+            }
+
             "startRecording", "stopRecording" -> {
                 result.error(ErrorCodes.RECORDING_FAILED, "not implemented", null)
             }

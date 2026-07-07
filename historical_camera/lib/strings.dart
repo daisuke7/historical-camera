@@ -37,4 +37,22 @@ class Strings {
   // Media-boundary callouts shown for 1.5 s when crossed (docs/04 §3).
   static const boundaryPhotography = '1839 写真の発明';
   static const boundaryEngraving = '1500 版画の時代へ';
+
+  // Debug hidden panel (docs/04 §8).
+  static const debugPanelTitle = 'フィルター調整';
+  static const debugModeLinked = '年代連動';
+  static const debugModeManual = '手動';
+  static const debugManualBadge = '手動';
+  static const debugCopyJson = 'JSONコピー';
+  static const debugJsonCopied = 'JSONをコピーしました';
+  static const debugResolutionLabel = '解像度';
+  static const debugRegionLabel = '版画プリセット';
+  static const debugRegionJapanese = '和';
+  static const debugRegionWestern = '洋';
+  static const debugRegionPending = 'T20で実装後に有効';
+  static const debugGpuPlaceholder = 'GPU --';
+
+  /// GPU readout in the debug panel header; shown red above the 8 ms budget.
+  static String debugGpu(double gpuMs) =>
+      'GPU ${gpuMs.toStringAsFixed(2)} ms';
 }

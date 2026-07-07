@@ -102,6 +102,12 @@ void main() {
       expect(photo.height, 3024);
     });
 
+    test('setDebugStatsEnabled sends the enabled flag', () async {
+      await NativeCameraApi().setDebugStatsEnabled(true);
+      expect(log.single.method, 'setDebugStatsEnabled');
+      expect(log.single.arguments, {'enabled': true});
+    });
+
     test('PlatformException from native propagates', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(methodChannel, (call) async {
@@ -128,6 +134,7 @@ void main() {
             events.success({'type': 'photoSaved', 'path': '/tmp/x.jpg'});
             events.success({'type': 'thermal', 'level': 'serious'});
             events.success({'type': 'recordingProgress', 'elapsedMs': 1000});
+            events.success({'type': 'debugStats', 'gpuMs': 5.5});
             events
                 .success({'type': 'error', 'code': 'SAVE_FAILED', 'message': 'disk full'});
             events.endOfStream();
@@ -142,6 +149,7 @@ void main() {
         CameraEvent.photoSaved('/tmp/x.jpg'),
         CameraEvent.thermal(ThermalLevel.serious),
         CameraEvent.recordingProgress(1000),
+        CameraEvent.debugStats(5.5),
         CameraEvent.error('SAVE_FAILED', 'disk full'),
       ]);
     });

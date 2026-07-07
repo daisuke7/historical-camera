@@ -110,6 +110,11 @@ final cameraNotifierProvider =
 class CameraNotifier extends Notifier<CameraState> {
   StreamSubscription<CameraEvent>? _eventSub;
 
+  /// Preset passed to native `initialize`. The P0/P1 default is hd720 until
+  /// the 1080p gate lands (docs/08 §6.4, T14); the debug panel can override
+  /// it explicitly (docs/04 §8.2).
+  String _resolutionPreset = 'hd720';
+
   @override
   CameraState build() {
     ref.onDispose(() {
@@ -142,7 +147,8 @@ class CameraNotifier extends Notifier<CameraState> {
     _eventSub ??= _api.events.listen(_onEvent);
 
     try {
-      final info = await _api.initialize();
+      final info =
+          await _api.initialize(resolutionPreset: _resolutionPreset);
       state = state.copyWith(
         phase: CameraPhase.previewing,
         textureId: info.textureId,
@@ -221,6 +227,29 @@ class CameraNotifier extends Notifier<CameraState> {
     state = state.copyWith(phase: CameraPhase.previewing);
   }
 
+  /// Debug-panel resolution override (docs/04 §8.2): tears the native
+  /// session down and re-initializes with the given preset.
+  Future<void> reinitializeWithPreset(String resolutionPreset) async {
+    if (state.phase == CameraPhase.initializing ||
+        state.phase == CameraPhase.capturing ||
+        state.phase == CameraPhase.recording) {
+      return;
+    }
+    _resolutionPreset = resolutionPreset;
+    try {
+      await _api.dispose();
+    } on PlatformException {
+      // A half-open session must not block the re-initialize.
+    }
+    state = state.copyWith(
+      phase: CameraPhase.uninitialized,
+      textureId: null,
+      previewWidth: null,
+      previewHeight: null,
+    );
+    await initialize();
+  }
+
   Future<void> openAppSettings() =>
       ref.read(permissionServiceProvider).openAppSettings();
 
@@ -241,6 +270,9 @@ class CameraNotifier extends Notifier<CameraState> {
         state = state.copyWith(
           errorMessage: message.isEmpty ? code : message,
         );
+      case DebugStatsEvent():
+        // Consumed by the debug panel's own provider (docs/04 §8.3).
+        break;
       case CameraInitializedEvent():
         // Auxiliary only; never drive transitions from it (docs/02 §3.2).
         break;
