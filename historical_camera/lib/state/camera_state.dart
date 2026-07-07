@@ -110,10 +110,10 @@ final cameraNotifierProvider =
 class CameraNotifier extends Notifier<CameraState> {
   StreamSubscription<CameraEvent>? _eventSub;
 
-  /// Preset passed to native `initialize`. The P0/P1 default is hd720 until
-  /// the 1080p gate lands (docs/08 §6.4, T14); the debug panel can override
-  /// it explicitly (docs/04 §8.2).
-  String _resolutionPreset = 'hd720';
+  /// Preset passed to native `initialize`. "auto" is the default since T14:
+  /// native resolves it from the persisted 1080p gate result (docs/01 §1.1,
+  /// 08 §8.3). The debug panel can override it explicitly (docs/04 §8.2).
+  String _resolutionPreset = 'auto';
 
   @override
   CameraState build() {

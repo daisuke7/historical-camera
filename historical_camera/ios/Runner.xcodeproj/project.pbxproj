@@ -23,6 +23,7 @@
 		BB1CAFE00000000000000005 /* MediaWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1CAFE00000000000000005 /* MediaWriter.swift */; };
 		BB1CAFE00000000000000006 /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = AA1CAFE00000000000000006 /* Shaders.metal */; };
 		BB1CAFE00000000000000007 /* FilterBenchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1CAFE00000000000000007 /* FilterBenchmark.swift */; };
+		BB1CAFE00000000000000008 /* ResolutionGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1CAFE00000000000000008 /* ResolutionGate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -73,6 +74,7 @@
 		AA1CAFE00000000000000005 /* MediaWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaWriter.swift; sourceTree = "<group>"; };
 		AA1CAFE00000000000000006 /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
 		AA1CAFE00000000000000007 /* FilterBenchmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterBenchmark.swift; sourceTree = "<group>"; };
+		AA1CAFE00000000000000008 /* ResolutionGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResolutionGate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -153,6 +155,7 @@
 				AA1CAFE00000000000000005 /* MediaWriter.swift */,
 				AA1CAFE00000000000000006 /* Shaders.metal */,
 				AA1CAFE00000000000000007 /* FilterBenchmark.swift */,
+				AA1CAFE00000000000000008 /* ResolutionGate.swift */,
 			);
 			path = HistoricalCamera;
 			sourceTree = "<group>";
@@ -320,6 +323,7 @@
 				BB1CAFE00000000000000005 /* MediaWriter.swift in Sources */,
 				BB1CAFE00000000000000006 /* Shaders.metal in Sources */,
 				BB1CAFE00000000000000007 /* FilterBenchmark.swift in Sources */,
+				BB1CAFE00000000000000008 /* ResolutionGate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

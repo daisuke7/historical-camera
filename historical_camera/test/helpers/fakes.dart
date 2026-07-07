@@ -24,7 +24,7 @@ class FakeNativeCameraApi implements NativeCameraApi {
   @override
   Future<PreviewInfo> initialize({
     String lens = 'back',
-    String resolutionPreset = 'hd720',
+    String resolutionPreset = 'auto',
   }) async {
     calls.add('initialize');
     lastResolutionPreset = resolutionPreset;

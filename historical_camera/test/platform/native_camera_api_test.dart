@@ -75,7 +75,8 @@ void main() {
     test('initialize sends defaults and parses PreviewInfo', () async {
       responder = (call) {
         expect(call.method, 'initialize');
-        expect(call.arguments, {'lens': 'back', 'resolutionPreset': 'hd720'});
+        // "auto" is the Dart default since T14 (docs/08 §8.3).
+        expect(call.arguments, {'lens': 'back', 'resolutionPreset': 'auto'});
         return <String, Object?>{
           'textureId': 42,
           'previewWidth': 1280,

@@ -41,6 +41,8 @@ void main() {
       expect(state.quarterTurns, 1);
       // Initial params push: neutral because year == nowYear.
       expect(h.api.lastParams, FilterParams.neutral);
+      // "auto" is the default preset since T14 (docs/08 §8.3).
+      expect(h.api.lastResolutionPreset, 'auto');
     });
 
     test('permission denied: native is never touched', () async {

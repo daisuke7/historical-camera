@@ -76,8 +76,7 @@ class CameraController(
     private var pendingInitResult: ((Result<Map<String, Any>>) -> Unit)? = null
     private var isFrontLens = false
     private var captureInFlight = false
-    private var resolutionSelector:
-        androidx.camera.core.resolutionselector.ResolutionSelector? = null
+    private var resolvedPreset = "hd720"
     private var cameraSelector: CameraSelector? = null
     private var isThrottled = false
     private val writerExecutor = Executors.newSingleThreadExecutor()
@@ -124,14 +123,10 @@ class CameraController(
                 val provider = providerFuture.get()
                 cameraProvider = provider
 
-                val targetSize =
-                    if (resolutionPreset == "hd1080") Size(1920, 1080)
-                    else Size(1280, 720)
-                resolutionSelector = ResolutionSelector.Builder()
-                    .setResolutionStrategy(ResolutionStrategy(
-                        targetSize,
-                        ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
-                    .build()
+                // "auto" resolves against the persisted 1080p gate result
+                // (docs/01 §1.1, 02 §3.1); absent result means hd720.
+                resolvedPreset =
+                    ResolutionGate.resolvePreset(activity, resolutionPreset)
 
                 imageCapture = ImageCapture.Builder()
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
@@ -168,7 +163,7 @@ class CameraController(
 
     private fun buildPreview(throttled: Boolean): Preview {
         val builder = Preview.Builder()
-            .setResolutionSelector(requireNotNull(resolutionSelector))
+            .setResolutionSelector(selectorFor(throttled))
         if (throttled) {
             // Thermal auto-downgrade to 24 fps (docs/02 §6.1).
             builder.setTargetFrameRate(Range(15, 24))
@@ -178,6 +173,23 @@ class CameraController(
             handleSurfaceRequest(request)
         }
         return preview
+    }
+
+    /**
+     * Capture resolution for the current thermal state: 1080p operation
+     * drops back to the 720p class under thermal pressure (docs/02 §6.1;
+     * the fixed-size output texture is unaffected — smaller camera buffers
+     * just get sampled up).
+     */
+    private fun selectorFor(throttled: Boolean): ResolutionSelector {
+        val targetSize =
+            if (resolvedPreset == "hd1080" && !throttled) Size(1920, 1080)
+            else Size(1280, 720)
+        return ResolutionSelector.Builder()
+            .setResolutionStrategy(ResolutionStrategy(
+                targetSize,
+                ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
+            .build()
     }
 
     private fun handleSurfaceRequest(request: SurfaceRequest) {
@@ -192,7 +204,9 @@ class CameraController(
         // rotated dimensions (implementation-notes #3).
         val swap = (sensorRotationDegrees / 90) % 2 == 1
         val outSize = if (swap) Size(size.height, size.width) else size
-        outputSize = outSize
+        // Keep the first negotiation as the fixed output/reference size; a
+        // thermal rebind (selectorFor) must not move it (docs/02 §4.1).
+        if (outputSize == null) outputSize = outSize
         renderer.configure(
             size.width, size.height,
             outSize.width, outSize.height, isFrontLens) { surface ->
@@ -237,6 +251,8 @@ class CameraController(
             "previewHeight" to size.height,
             "quarterTurns" to currentQuarterTurns,
         )))
+        // One-time 1080p gate bench, off the critical path (docs/01 §1.1).
+        ResolutionGate.scheduleIfNeeded(activity)
     }
 
     private fun failInitialize(error: PluginError) {

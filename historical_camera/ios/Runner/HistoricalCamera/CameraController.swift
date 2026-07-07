@@ -41,6 +41,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     private var currentQuarterTurns = 1
     private var observersInstalled = false
     private var previewWidth = 1280
+    private var isHD1080Session = false
     private var lensPosition: AVCaptureDevice.Position = .back
     private var inFlightCapture: PhotoCaptureDelegate?
 
@@ -138,7 +139,10 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         }
 
         let session = AVCaptureSession()
-        let isHD1080 = resolutionPreset == "hd1080"
+        // "auto" resolves against the persisted 1080p gate result
+        // (docs/01 §1.1, 02 §3.1); an absent result means hd720.
+        let resolved = ResolutionGate.resolvePreset(resolutionPreset)
+        let isHD1080 = resolved == "hd1080"
         session.sessionPreset = isHD1080 ? .hd1920x1080 : .hd1280x720
         let width = isHD1080 ? 1920 : 1280
         let height = isHD1080 ? 1080 : 720
@@ -217,10 +221,14 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         self.renderer = renderer
         self.textureId = textureId
         self.previewWidth = width
+        self.isHD1080Session = isHD1080
         self.lensPosition = position
 
         session.startRunning()
         isInitialized = true
+
+        // One-time 1080p gate bench, off the critical path (docs/01 §1.1).
+        ResolutionGate.scheduleIfNeeded()
 
         // UIDevice must be touched on the main thread. The session queue is
         // never blocked by main here (plugin calls dispatch async).
@@ -451,6 +459,19 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         // Auto-downgrade to 24 fps under thermal pressure.
         let throttled = state == .serious || state == .critical
         sessionQueue.async {
+            // 1080p operation drops back to the 720p class (docs/02 §6.1).
+            // The fixed-size output pool is unaffected: smaller camera
+            // buffers just get sampled up.
+            if self.isHD1080Session, let session = self.session {
+                let target: AVCaptureSession.Preset =
+                    throttled ? .hd1280x720 : .hd1920x1080
+                if session.sessionPreset != target,
+                   session.canSetSessionPreset(target) {
+                    session.beginConfiguration()
+                    session.sessionPreset = target
+                    session.commitConfiguration()
+                }
+            }
             guard let device = self.videoDevice,
                   (try? device.lockForConfiguration()) != nil
             else { return }

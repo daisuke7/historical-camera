@@ -146,4 +146,33 @@ class RunnerTests: XCTestCase {
         "eraFilter exceeds the 8 ms GPU budget for \(label)")
     }
   }
+
+  /// 1080p gate preset resolution (docs/01 §1.1, 02 §3.1): "auto" resolves
+  /// from the persisted per-version result, everything else passes through,
+  /// and an absent result stays conservative (hd720).
+  func testResolutionGateResolvePreset() {
+    let suite = "ResolutionGateTests"
+    let defaults = UserDefaults(suiteName: suite)!
+    defaults.removePersistentDomain(forName: suite)
+    defer { defaults.removePersistentDomain(forName: suite) }
+
+    XCTAssertEqual(
+      ResolutionGate.resolvePreset("hd720", defaults: defaults), "hd720")
+    XCTAssertEqual(
+      ResolutionGate.resolvePreset("hd1080", defaults: defaults), "hd1080",
+      "explicit presets bypass the gate")
+    XCTAssertEqual(
+      ResolutionGate.resolvePreset("auto", defaults: defaults), "hd720",
+      "no stored result must resolve to hd720")
+
+    defaults.set(false, forKey: ResolutionGate.storageKey)
+    XCTAssertEqual(
+      ResolutionGate.resolvePreset("auto", defaults: defaults), "hd720",
+      "a failed gate keeps hd720")
+
+    defaults.set(true, forKey: ResolutionGate.storageKey)
+    XCTAssertEqual(
+      ResolutionGate.resolvePreset("auto", defaults: defaults), "hd1080",
+      "a passed gate unlocks hd1080")
+  }
 }

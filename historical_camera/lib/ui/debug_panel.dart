@@ -71,7 +71,7 @@ class DebugPanelController extends Notifier<DebugPanelState> {
       visible: false,
       manual: false,
       manualParams: FilterParams.neutral,
-      resolutionPreset: 'hd720',
+      resolutionPreset: 'auto',
     );
   }
 
@@ -136,8 +136,8 @@ class DebugPanelController extends Notifier<DebugPanelState> {
   }
 
   /// Explicit resolution selection; re-initializes the native session
-  /// (docs/04 §8.2). Note: "auto" resolves on the native side only after T14;
-  /// until then it behaves as hd720.
+  /// (docs/04 §8.2). "auto" resolves from the persisted 1080p gate result
+  /// on the native side (docs/01 §1.1).
   Future<void> setResolutionPreset(String preset) async {
     if (preset == state.resolutionPreset) return;
     state = state.copyWith(resolutionPreset: preset);

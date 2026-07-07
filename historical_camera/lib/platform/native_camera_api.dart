@@ -89,7 +89,9 @@ class NativeCameraApi {
 
   Future<PreviewInfo> initialize({
     String lens = 'back',
-    String resolutionPreset = 'hd720',
+    // "auto": native resolves hd720/hd1080 from the persisted 1080p gate
+    // result (docs/01 §1.1, 02 §3.1). Default since T14 (docs/08 §8.3).
+    String resolutionPreset = 'auto',
   }) async {
     final map = await _method.invokeMapMethod<String, Object?>('initialize', {
       'lens': lens,
