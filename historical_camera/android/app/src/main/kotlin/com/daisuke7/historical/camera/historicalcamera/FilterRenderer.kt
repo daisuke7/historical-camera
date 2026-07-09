@@ -336,9 +336,6 @@ void main() {
     @Volatile
     var onFirstTransform: ((FloatArray) -> Unit)? = null
 
-    @Volatile
-    private var mirror = false
-
     /** Set synchronously at release time so no further frame reaches the
      *  (possibly detached) Flutter engine. */
     @Volatile
@@ -426,11 +423,9 @@ void main() {
         bufferH: Int,
         outW: Int,
         outH: Int,
-        mirror: Boolean,
         onReady: (Surface) -> Unit,
     ) {
         handler.post {
-            this.mirror = mirror
             if (!configured) {
                 width = outW
                 height = outH
@@ -767,16 +762,10 @@ void main() {
             locs.texCoord, 2, GLES30.GL_FLOAT, false, 0, texCoordBuffer)
 
         // The SurfaceTexture matrix carries flip/crop plus the HAL's sensor
-        // rotation (implementation-notes #3). Front-camera mirroring is
-        // folded in here.
-        val matrix = texMatrix.copyOf()
-        if (mirror) {
-            for (row in 0..3) {
-                matrix[row] = -matrix[row]
-                matrix[12 + row] += texMatrix[row]
-            }
-        }
-        GLES30.glUniformMatrix4fv(locs.texMatrix, 1, false, matrix, 0)
+        // rotation, and for the front camera the selfie mirror as well
+        // (implementation-notes #3/#6, Pixel 6 measured) — no extra mirror
+        // here or the two would cancel out.
+        GLES30.glUniformMatrix4fv(locs.texMatrix, 1, false, texMatrix, 0)
 
         GLES30.glUniform1fv(locs.params, 20, params.toFloatArray(), 0)
         GLES30.glUniform1f(locs.time, currentTimeSeconds())

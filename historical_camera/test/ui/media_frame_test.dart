@@ -68,6 +68,27 @@ void main() {
           reason: 'the previous frame is gone after the crossfade');
     });
 
+    testWidgets('re-entering a band mid-crossfade does not duplicate keys '
+        '(seen on device with fast slider drags)', (tester) async {
+      await pumpApp(tester);
+      final n = notifier(tester);
+
+      // deckle -> silverPrint -> deckle within the 300 ms fade: the two
+      // deckle entries must not collide inside the AnimatedSwitcher stack.
+      n.onYearChanged(1950);
+      await tester.pump(const Duration(milliseconds: 50));
+      n.onYearChanged(1965);
+      await tester.pump(const Duration(milliseconds: 50));
+      n.onYearChanged(1950);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(tester.takeException(), isNull);
+
+      await tester.pump(EraLabel.visibleDuration);
+      await tester.pumpAndSettle();
+      expect(
+          find.byKey(const ValueKey(MediaFrameStyle.deckle)), findsOneWidget);
+    });
+
     testWidgets('frame layer never blocks pointer events', (tester) async {
       await pumpApp(tester);
       notifier(tester).onYearChanged(1100); // scroll frame covers edges

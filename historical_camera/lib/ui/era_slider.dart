@@ -203,8 +203,12 @@ class _EraSliderPainter extends CustomPainter {
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      final x = (_xForYear(labelYear, size) - painter.width / 2)
-          .clamp(0.0, size.width - painter.width);
+      // The upper bound can go below 0 mid-rotation when the slider is
+      // momentarily narrower than the label; clamp would throw then.
+      final x = math.max(
+          0.0,
+          math.min(_xForYear(labelYear, size) - painter.width / 2,
+              size.width - painter.width));
       painter.paint(canvas, Offset(x, _trackY + 10));
     }
 

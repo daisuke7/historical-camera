@@ -59,6 +59,49 @@ class RotationDiagnosisTest {
     }
 
     @Test
+    fun pixel6BackCameraMatrixMatchesTheExpectedModel() {
+        // Regression: the actual matrix logged on a Pixel 6 back camera
+        // (sensor=90 deg). The transform compensates the sensor rotation,
+        // so 90-degree sensors bake 270 degrees (3 turns), not 90.
+        val logged = floatArrayOf(
+            0f, -1f, 0f, 0f,
+            -1f, 0f, 0f, 0f,
+            0f, 0f, 1f, 0f,
+            1f, 1f, 0f, 1f,
+        )
+        val detected = RotationDiagnosis.detectBakedQuarterTurns(logged)
+        assertEquals(3, detected)
+        assertEquals(detected, RotationDiagnosis.expectedBakedQuarterTurns(90))
+    }
+
+    @Test
+    fun expectedTurnsInvertTheSensorOrientation() {
+        assertEquals(0, RotationDiagnosis.expectedBakedQuarterTurns(0))
+        assertEquals(3, RotationDiagnosis.expectedBakedQuarterTurns(90))
+        assertEquals(2, RotationDiagnosis.expectedBakedQuarterTurns(180))
+        assertEquals(1, RotationDiagnosis.expectedBakedQuarterTurns(270))
+    }
+
+    @Test
+    fun pixel6FrontCameraMatrixMatchesTheMirroredModel() {
+        // Regression: the actual matrix logged on the Pixel 6 front camera
+        // (sensor=270 deg). The selfie mirror joins the standard y-flip, so
+        // the determinant is positive and the rotation reads as +2 turns
+        // against the unmirrored expectation.
+        val logged = floatArrayOf(
+            0f, -1f, 0f, 0f,
+            1f, 0f, 0f, 0f,
+            0f, 0f, 1f, 0f,
+            0f, 1f, 0f, 1f,
+        )
+        val detected = RotationDiagnosis.detectBakedQuarterTurns(logged)
+        assertEquals(3, detected)
+        assertEquals(
+            detected,
+            RotationDiagnosis.expectedBakedQuarterTurns(270, mirrored = true))
+    }
+
+    @Test
     fun offGridMatricesReturnNull() {
         // 45-degree rotation is not on the 90-degree grid.
         val s = 0.7071f

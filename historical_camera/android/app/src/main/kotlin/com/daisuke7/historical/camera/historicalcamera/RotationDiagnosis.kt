@@ -23,6 +23,24 @@ object RotationDiagnosis {
      * a negative determinant) and crop-induced scale/translation are
      * normalized away before classification.
      */
+    /**
+     * The quarter turns [detectBakedQuarterTurns] should report on a device
+     * following the docs/02 §4.1 model. The transform *compensates* the
+     * sensor rotation (it turns sensor-oriented pixels upright), so the
+     * baked rotation is the inverse of the sensor orientation: a 90-degree
+     * sensor bakes a 270-degree turn (verified on Pixel 6).
+     *
+     * The front camera additionally bakes the selfie mirror. Mirror x flipV
+     * equals a 180-degree turn, so a mirrored transform reads as the
+     * unmirrored rotation plus 2 (and a positive determinant, which
+     * [detectBakedQuarterTurns] already normalizes for).
+     */
+    fun expectedBakedQuarterTurns(
+        sensorDegrees: Int,
+        mirrored: Boolean = false,
+    ): Int =
+        ((4 - sensorDegrees / 90) % 4 + (if (mirrored) 2 else 0) + 4) % 4
+
     fun detectBakedQuarterTurns(matrix: FloatArray): Int? {
         if (matrix.size < 16) return null
         val a = matrix[0]

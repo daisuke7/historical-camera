@@ -50,25 +50,41 @@ MediaFrameStyle frameStyleForYear(int quantizedYear) {
 
 /// Stack layer for CameraScreen. Crossfades between frames over 300 ms when
 /// the era band changes (docs/04 §7).
-class MediaFrameOverlay extends ConsumerWidget {
+class MediaFrameOverlay extends ConsumerStatefulWidget {
   const MediaFrameOverlay({super.key});
 
   static const crossfadeDuration = Duration(milliseconds: 300);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MediaFrameOverlay> createState() => _MediaFrameOverlayState();
+}
+
+class _MediaFrameOverlayState extends ConsumerState<MediaFrameOverlay> {
+  MediaFrameStyle? _lastStyle;
+  int _generation = 0;
+
+  @override
+  Widget build(BuildContext context) {
     final quantizedYear = ref.watch(
       cameraNotifierProvider.select((s) => s.quantizedYear),
     );
     final style = frameStyleForYear(quantizedYear);
+    if (style != _lastStyle) {
+      _lastStyle = style;
+      // A fast slider drag can re-enter a style while its previous entry is
+      // still fading out; keying the switcher child by style alone would
+      // then put duplicate keys in the AnimatedSwitcher's stack.
+      _generation++;
+    }
     return IgnorePointer(
       child: AnimatedSwitcher(
-        duration: crossfadeDuration,
+        duration: MediaFrameOverlay.crossfadeDuration,
         child: KeyedSubtree(
-          key: ValueKey(style),
+          key: ValueKey('$style#$_generation'),
           child: style == MediaFrameStyle.none
-              ? const SizedBox.expand()
+              ? SizedBox.expand(key: ValueKey(style))
               : OrientationBuilder(
+                  key: ValueKey(style),
                   builder: (context, orientation) => CustomPaint(
                     size: Size.infinite,
                     painter: _painterFor(style, orientation),

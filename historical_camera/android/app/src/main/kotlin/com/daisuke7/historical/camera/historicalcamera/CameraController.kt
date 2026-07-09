@@ -221,7 +221,7 @@ class CameraController(
         if (outputSize == null) outputSize = outSize
         renderer.configure(
             size.width, size.height,
-            outSize.width, outSize.height, isFrontLens) { surface ->
+            outSize.width, outSize.height) { surface ->
             request.provideSurface(surface, mainExecutor) {}
             mainHandler.post { completeInitialize(outSize) }
         }
@@ -500,7 +500,8 @@ class CameraController(
      */
     private fun diagnoseRotationModel(matrix: FloatArray) {
         val detected = RotationDiagnosis.detectBakedQuarterTurns(matrix)
-        val expected = ((sensorRotationDegrees / 90) % 4 + 4) % 4
+        val expected = RotationDiagnosis.expectedBakedQuarterTurns(
+            sensorRotationDegrees, mirrored = isFrontLens)
         if (detected == expected) return
         Log.w(TAG, "rotation model mismatch: expected $expected quarter " +
             "turns (sensor=$sensorRotationDegrees deg), detected " +
